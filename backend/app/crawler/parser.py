@@ -1,3 +1,5 @@
+import json
+
 from bs4 import BeautifulSoup
 
 
@@ -60,3 +62,28 @@ def parse_broadcast_list_page(html: str) -> dict:
 
     has_next_page = soup.select_one("a.bc-pager__nav[rel='next']") is not None
     return {"items": items, "has_next_page": has_next_page}
+
+
+def parse_place_detail_page(html: str) -> dict | None:
+    soup = BeautifulSoup(html, "html.parser")
+
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            data = json.loads(script.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        if data.get("@type") != "Restaurant":
+            continue
+
+        geo = data.get("geo") or {}
+        return {
+            "name": data.get("name"),
+            "address": data.get("address"),
+            "latitude": geo.get("latitude"),
+            "longitude": geo.get("longitude"),
+            "phone": data.get("telephone"),
+            "category": data.get("servesCuisine"),
+        }
+
+    return None
