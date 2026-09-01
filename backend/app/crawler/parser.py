@@ -64,6 +64,34 @@ def parse_broadcast_list_page(html: str) -> dict:
     return {"items": items, "has_next_page": has_next_page}
 
 
+def _find_restaurant_entity(data) -> dict | None:
+    """Locate the Restaurant entity within a parsed JSON-LD block.
+
+    Handles three shapes seen in the wild: a single object (the primary,
+    expected case), a top-level array of entities (`[{...}, {...}]`), and a
+    dict wrapping entities in an `"@graph"` list (`{"@graph": [...]}`).
+    """
+    if isinstance(data, dict):
+        if data.get("@type") == "Restaurant":
+            return data
+
+        graph = data.get("@graph")
+        if isinstance(graph, list):
+            for entity in graph:
+                if isinstance(entity, dict) and entity.get("@type") == "Restaurant":
+                    return entity
+
+        return None
+
+    if isinstance(data, list):
+        for entity in data:
+            if isinstance(entity, dict) and entity.get("@type") == "Restaurant":
+                return entity
+        return None
+
+    return None
+
+
 def parse_place_detail_page(html: str) -> dict | None:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -73,20 +101,18 @@ def parse_place_detail_page(html: str) -> dict | None:
         except (json.JSONDecodeError, TypeError):
             continue
 
-        if not isinstance(data, dict):
+        entity = _find_restaurant_entity(data)
+        if entity is None:
             continue
 
-        if data.get("@type") != "Restaurant":
-            continue
-
-        geo = data.get("geo") or {}
+        geo = entity.get("geo") or {}
         return {
-            "name": data.get("name"),
-            "address": data.get("address"),
+            "name": entity.get("name"),
+            "address": entity.get("address"),
             "latitude": geo.get("latitude"),
             "longitude": geo.get("longitude"),
-            "phone": data.get("telephone"),
-            "category": data.get("servesCuisine"),
+            "phone": entity.get("telephone"),
+            "category": entity.get("servesCuisine"),
         }
 
     return None
