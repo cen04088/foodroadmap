@@ -23,3 +23,18 @@ def test_parse_place_detail_page_returns_none_without_restaurant_jsonld():
     result = parse_place_detail_page("<html><body>no data here</body></html>")
 
     assert result is None
+
+
+def test_parse_place_detail_page_skips_non_dict_jsonld():
+    html = """
+    <html>
+    <body>
+    <script type="application/ld+json">["not", "a", "dict"]</script>
+    <script type="application/ld+json">{"@type": "WebSite", "name": "example"}</script>
+    </body>
+    </html>
+    """
+
+    result = parse_place_detail_page(html)
+
+    assert result is None

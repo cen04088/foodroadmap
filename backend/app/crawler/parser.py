@@ -73,6 +73,9 @@ def parse_place_detail_page(html: str) -> dict | None:
         except (json.JSONDecodeError, TypeError):
             continue
 
+        if not isinstance(data, dict):
+            continue
+
         if data.get("@type") != "Restaurant":
             continue
 
