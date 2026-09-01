@@ -54,14 +54,18 @@
   - 프론트엔드 지도 표시는 카카오맵 JS SDK 사용.
   - (맛집 좌표는 matzipmap 상세 페이지에서 이미 확보되므로, 카카오 로컬 API는 이 서비스에서
     사용하지 않음.)
-  - **요청**: `GET https://apis-navi.kakaomobility.com/affiliate/v1/directions`,
-    헤더 `Authorization: KakaoAK ${REST_API_KEY}`, 쿼리 파라미터
-    `origin=${lng},${lat}`, `destination=${lng},${lat}` (카카오는 x=경도, y=위도 순서).
-  - **응답 구조** (카카오모빌리티 공식 문서 기준, 2026-09-01 확인 — **실제 API 키로 라이브
-    검증은 아직 못함**, 백엔드 구현 착수 시 실제 키로 1회 검증 필요):
-    `routes[0].summary.distance`(총 거리, m), `routes[0].summary.duration`(총 소요시간, 초),
-    `routes[0].sections[].roads[]` 배열의 각 road가 `distance`(m), `duration`(초),
-    `vertexes`(평탄화된 `[lng, lat, lng, lat, ...]` 배열, **{x,y} 객체 배열이 아님**)를 가짐.
+  - **요청**: `GET https://apis-navi.kakaomobility.com/v1/directions` (주의: `/affiliate/v1/...`
+    경로가 **아님** — affiliate 경로는 별도 제휴 승인이 필요한 상품이라 403 permission
+    denied가 남; 일반 REST API 키로는 `/v1/directions`를 사용), 헤더
+    `Authorization: KakaoAK ${REST_API_KEY}`, 쿼리 파라미터 `origin=${lng},${lat}`,
+    `destination=${lng},${lat}` (카카오는 x=경도, y=위도 순서).
+  - **응답 구조** — 실제 REST API 키로 라이브 호출해 검증 완료(2026-09-01, 서울시청→강남역
+    구간):
+    `routes[0].result_code`(0=성공), `routes[0].summary.distance`(총 거리, m),
+    `routes[0].summary.duration`(총 소요시간, 초), `routes[0].sections[].roads[]` 배열의 각
+    road가 `distance`(m), `duration`(초), `vertexes`(평탄화된 `[lng, lat, lng, lat, ...]` 배열,
+    {x,y} 객체 배열이 아님을 확인)를 가짐. 문서 기준 스키마와 실제 응답이 정확히 일치함을
+    확인했다.
   - **중요**: API 응답은 vertex 단위가 아니라 **road(도로 구간) 단위로만** 누적거리/시간을
     제공한다. vertex별 누적값은 API가 주지 않으므로, 이 서비스가 각 road의 vertex 목록을
     순회하며 직접 누적 distance/duration을 계산해야 한다 (§4 참고).
@@ -132,9 +136,6 @@
 ## 6. 에러 처리
 
 - 카카오 Directions API 실패/쿼터 초과 → 사용자에게 재시도 안내, 429/5xx 구분 로깅.
-- **카카오 API 응답 스키마는 공식 문서 기준으로 구현하되(§2.3), 실제 키로 라이브 검증되지
-  않았음** — 백엔드 구현 착수 시 실제 REST API 키로 최소 1회 실제 호출해 파싱 코드가
-  진짜 응답과 맞는지 확인 필요. 문서와 실제 응답이 다를 경우 파싱 코드를 즉시 보정.
 - 상세 페이지에서 좌표(geo)를 파싱하지 못한 맛집 → 해당 레코드는 좌표 없이 저장하되
   매칭 대상(경로 계산)에서는 제외, 다음 크롤링 주기에 재시도.
 - 크롤러가 matzipmap.com 구조 변경(CSS 클래스/JSON-LD 스키마 변경 등)으로 파싱 실패 시 →
