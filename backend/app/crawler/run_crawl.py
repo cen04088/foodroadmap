@@ -50,20 +50,23 @@ def collect_program_restaurants(slug: str) -> list[dict]:
 
     while True:
         url = f"{BASE_URL}/broadcast/{slug}?page={page}"
+        # Sleep before every request (including the first) so the delay always
+        # separates this request from whatever request preceded it, regardless
+        # of which loop or phase boundary it falls on.
+        time.sleep(REQUEST_DELAY_SECONDS)
         try:
             html = fetch_url(url)
-        except RuntimeError:
-            logger.warning("failed to fetch list page, skipping: %s", url)
+            result = parse_broadcast_list_page(html)
+        except Exception:
+            logger.warning("failed to fetch/parse list page, skipping: %s", url, exc_info=True)
             break
 
-        result = parse_broadcast_list_page(html)
         all_items.extend(result["items"])
 
         if not result["has_next_page"]:
             break
 
         page += 1
-        time.sleep(REQUEST_DELAY_SECONDS)
 
     return all_items
 
@@ -74,6 +77,7 @@ def run_crawl(session_factory=None) -> None:
         init_db(engine)
         session_factory = make_session_factory(engine)
 
+    time.sleep(REQUEST_DELAY_SECONDS)
     programs_html = fetch_url(f"{BASE_URL}/broadcasts")
     programs = parse_broadcasts_list_page(programs_html)
 
@@ -83,20 +87,31 @@ def run_crawl(session_factory=None) -> None:
     with session_factory() as session:
         for program in programs:
             upsert_broadcast(session, program["slug"], program["name"])
-            time.sleep(REQUEST_DELAY_SECONDS)
 
-            for item in collect_program_restaurants(program["slug"]):
+            try:
+                items = collect_program_restaurants(program["slug"])
+            except Exception:
+                logger.warning(
+                    "failed to process program, skipping: %s", program["slug"], exc_info=True
+                )
+                continue
+
+            for item in items:
                 restaurant_data.setdefault(item["external_id"], item)
                 restaurant_programs.setdefault(item["external_id"], []).append(program["slug"])
 
         for external_id, base_data in restaurant_data.items():
+            time.sleep(REQUEST_DELAY_SECONDS)
             try:
                 detail_html = fetch_url(f"{BASE_URL}/place/{external_id}")
                 detail = parse_place_detail_page(detail_html)
-            except RuntimeError:
-                logger.warning("failed to fetch detail page, skipping geo: %s", external_id)
+            except Exception:
+                logger.warning(
+                    "failed to fetch/parse detail page, skipping geo: %s",
+                    external_id,
+                    exc_info=True,
+                )
                 detail = None
-            time.sleep(REQUEST_DELAY_SECONDS)
 
             merged = {**base_data}
             if detail:
