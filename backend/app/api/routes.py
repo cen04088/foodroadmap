@@ -50,7 +50,7 @@ def _serialize_match(match: RestaurantMatch) -> dict:
 def get_route_restaurants(
     origin: str = Query(..., description="lat,lng"),
     destination: str = Query(..., description="lat,lng"),
-    radius_km: float = Query(DEFAULT_RADIUS_KM, gt=0),
+    radius_km: float = Query(DEFAULT_RADIUS_KM, gt=0, le=50),
     broadcast: str | None = Query(None),
     category: str | None = Query(None),
     session: Session = Depends(get_session),

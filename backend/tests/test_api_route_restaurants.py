@@ -53,7 +53,17 @@ def seed(session_factory):
 
         far = Restaurant(id="far", name="Far Restaurant", latitude=38.5, longitude=128.5, category="한식")
 
-        session.add_all([near, far])
+        # ~1.5km perpendicular from the route line (see test_radius_km_* tests below):
+        # excluded at radius_km=1.0, included at radius_km=3.0 (and at the 2.0 default).
+        medium = Restaurant(
+            id="medium",
+            name="Medium Restaurant",
+            latitude=37.558384,
+            longitude=127.036679,
+            category="한식",
+        )
+
+        session.add_all([near, far, medium])
         session.commit()
 
 
@@ -125,6 +135,79 @@ def test_get_route_restaurants_filters_by_broadcast_query_param(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["restaurants"] == []
+
+
+def test_get_route_restaurants_filters_by_broadcast_display_name(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "app.api.routes.fetch_route", lambda *args, **kwargs: FAKE_KAKAO_RESPONSE
+    )
+
+    session_factory = make_test_session_factory()
+    seed(session_factory)
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+
+    client = TestClient(app)
+    try:
+        response = client.get(
+            "/api/route-restaurants",
+            params={
+                "origin": "37.5,127.0",
+                "destination": "37.6,127.1",
+                "broadcast": "또간집",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    names = [r["name"] for r in response.json()["restaurants"]]
+    assert names == ["Near Restaurant"]
+
+
+def test_get_route_restaurants_radius_km_override_changes_included_restaurants(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "app.api.routes.fetch_route", lambda *args, **kwargs: FAKE_KAKAO_RESPONSE
+    )
+
+    session_factory = make_test_session_factory()
+    seed(session_factory)
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+
+    client = TestClient(app)
+    try:
+        small_radius_response = client.get(
+            "/api/route-restaurants",
+            params={"origin": "37.5,127.0", "destination": "37.6,127.1", "radius_km": 1.0},
+        )
+        large_radius_response = client.get(
+            "/api/route-restaurants",
+            params={"origin": "37.5,127.0", "destination": "37.6,127.1", "radius_km": 3.0},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert small_radius_response.status_code == 200
+    assert large_radius_response.status_code == 200
+
+    small_names = [r["name"] for r in small_radius_response.json()["restaurants"]]
+    large_names = [r["name"] for r in large_radius_response.json()["restaurants"]]
+
+    assert "Medium Restaurant" not in small_names
+    assert "Medium Restaurant" in large_names
+
+
+def test_get_route_restaurants_returns_422_when_radius_km_exceeds_max(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/route-restaurants",
+        params={"origin": "37.5,127.0", "destination": "37.6,127.1", "radius_km": 51},
+    )
+
+    assert response.status_code == 422
 
 
 def test_get_route_restaurants_returns_400_for_malformed_origin(monkeypatch):

@@ -69,3 +69,19 @@ def test_query_candidate_restaurants_filters_by_broadcast_slug():
 
         ids = {r.id for r in results}
         assert ids == {"inside"}
+
+
+def test_query_candidate_restaurants_filters_by_broadcast_display_name():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed(session)
+
+        by_name = query_candidate_restaurants(
+            session, 37.0, 38.0, 126.5, 127.5, broadcast_slug="또간집"
+        )
+        by_slug = query_candidate_restaurants(
+            session, 37.0, 38.0, 126.5, 127.5, broadcast_slug="ttoganjib"
+        )
+
+        assert {r.id for r in by_name} == {"inside"}
+        assert {r.id for r in by_name} == {r.id for r in by_slug}

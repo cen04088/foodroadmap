@@ -76,6 +76,16 @@ def test_fetch_route_raises_kakao_directions_error_on_request_failure():
             fetch_route(37.5, 127.0, 37.6, 127.1, api_key="test-key")
 
 
+def test_fetch_route_raises_kakao_directions_error_on_json_decode_failure():
+    fake_response = Mock()
+    fake_response.raise_for_status = Mock()
+    fake_response.json = Mock(side_effect=requests.exceptions.JSONDecodeError("msg", "doc", 0))
+
+    with patch("app.kakao.directions.requests.get", return_value=fake_response):
+        with pytest.raises(KakaoDirectionsError):
+            fetch_route(37.5, 127.0, 37.6, 127.1, api_key="test-key")
+
+
 def test_parse_route_summary_extracts_totals():
     summary = parse_route_summary(FAKE_RESPONSE)
     assert summary == {"total_distance_m": 15000, "total_duration_sec": 1200}

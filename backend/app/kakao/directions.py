@@ -27,10 +27,9 @@ def fetch_route(
     try:
         response = requests.get(KAKAO_DIRECTIONS_URL, params=params, headers=headers, timeout=timeout)
         response.raise_for_status()
+        return response.json()
     except requests.RequestException as exc:
         raise KakaoDirectionsError(f"Kakao Directions API request failed: {exc}") from exc
-
-    return response.json()
 
 
 def parse_route_summary(response: dict) -> dict:
