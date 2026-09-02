@@ -53,10 +53,14 @@ def parse_route_points(response: dict) -> list[dict]:
         for road in section.get("roads", []):
             vertexes = road.get("vertexes") or []
             coords = list(zip(vertexes[0::2], vertexes[1::2]))  # (lng, lat) pairs
-            if len(coords) < 2:
-                continue
 
             road_duration_sec = road.get("duration", 0)
+
+            if len(coords) < 2:
+                # Degenerate road with < 2 vertexes: skip point emission but still advance cumulative totals
+                cumulative_distance_m += road.get("distance", 0)
+                cumulative_time_sec += road_duration_sec
+                continue
 
             seg_lengths_m = []
             for (lng1, lat1), (lng2, lat2) in zip(coords, coords[1:]):

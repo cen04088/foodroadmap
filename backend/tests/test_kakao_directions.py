@@ -113,3 +113,152 @@ def test_parse_route_points_raises_when_result_code_nonzero():
     }
     with pytest.raises(KakaoDirectionsError):
         parse_route_points(bad_response)
+
+
+def test_parse_route_points_proportional_time_split_across_unequal_segments():
+    """Test that a road with 3+ vertexes (2+ segments) splits duration proportionally by haversine distance."""
+    response = {
+        "trans_id": "fake-trans-id",
+        "routes": [
+            {
+                "result_code": 0,
+                "result_msg": "",
+                "summary": {
+                    "origin": {"name": "", "x": 127.0, "y": 37.5},
+                    "destination": {"name": "", "x": 127.2, "y": 37.7},
+                    "distance": 20000,
+                    "duration": 1200,
+                },
+                "sections": [
+                    {
+                        "distance": 20000,
+                        "duration": 1200,
+                        "roads": [
+                            {
+                                "name": "Multi-segment Road",
+                                "distance": 20000,
+                                "duration": 600,  # 600 seconds to split across 3 segments
+                                "traffic_speed": 40.0,
+                                "traffic_state": 1,
+                                # 4 vertexes = 3 segments
+                                "vertexes": [127.0, 37.5, 127.05, 37.6, 127.15, 37.65, 127.2, 37.7],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    points = parse_route_points(response)
+
+    # Should have 4 points: start + 3 intermediate/end
+    assert len(points) == 4
+
+    # First point: origin at cumulative 0
+    assert points[0] == {"lat": 37.5, "lng": 127.0, "cumulative_distance_m": 0.0, "cumulative_time_sec": 0.0}
+
+    # Intermediate points should have non-equal time splits based on segment distances
+    # seg1: (127.0,37.5) -> (127.05,37.6)
+    seg1_m = haversine_km(37.5, 127.0, 37.6, 127.05) * 1000
+    # seg2: (127.05,37.6) -> (127.15,37.65)
+    seg2_m = haversine_km(37.6, 127.05, 37.65, 127.15) * 1000
+    # seg3: (127.15,37.65) -> (127.2,37.7)
+    seg3_m = haversine_km(37.65, 127.15, 37.7, 127.2) * 1000
+    total_m = seg1_m + seg2_m + seg3_m
+
+    # Point 1 (after segment 1)
+    expected_time_1 = (seg1_m / total_m) * 600  # proportional to first segment
+    assert points[1]["lat"] == pytest.approx(37.6)
+    assert points[1]["lng"] == pytest.approx(127.05)
+    assert points[1]["cumulative_distance_m"] == pytest.approx(seg1_m)
+    assert points[1]["cumulative_time_sec"] == pytest.approx(expected_time_1)
+
+    # Point 2 (after segment 1+2)
+    expected_time_2 = ((seg1_m + seg2_m) / total_m) * 600
+    assert points[2]["lat"] == pytest.approx(37.65)
+    assert points[2]["lng"] == pytest.approx(127.15)
+    assert points[2]["cumulative_distance_m"] == pytest.approx(seg1_m + seg2_m)
+    assert points[2]["cumulative_time_sec"] == pytest.approx(expected_time_2)
+
+    # Point 3 (end, gets 100% of road duration)
+    assert points[3]["lat"] == pytest.approx(37.7)
+    assert points[3]["lng"] == pytest.approx(127.2)
+    assert points[3]["cumulative_distance_m"] == pytest.approx(total_m)
+    assert points[3]["cumulative_time_sec"] == pytest.approx(600.0)
+
+
+def test_parse_route_points_handles_degenerate_road_in_middle():
+    """Test that a degenerate road (< 2 vertexes) advances cumulative totals even when skipping point emission."""
+    response = {
+        "trans_id": "fake-trans-id",
+        "routes": [
+            {
+                "result_code": 0,
+                "result_msg": "",
+                "summary": {
+                    "origin": {"name": "", "x": 127.0, "y": 37.5},
+                    "destination": {"name": "", "x": 127.1, "y": 37.6},
+                    "distance": 20000,
+                    "duration": 1400,
+                },
+                "sections": [
+                    {
+                        "distance": 20000,
+                        "duration": 1400,
+                        "roads": [
+                            {
+                                "name": "Road A (normal)",
+                                "distance": 10000,
+                                "duration": 600,
+                                "traffic_speed": 40.0,
+                                "traffic_state": 1,
+                                "vertexes": [127.0, 37.5, 127.05, 37.55],
+                            },
+                            {
+                                "name": "Road B (degenerate - single vertex)",
+                                "distance": 5000,
+                                "duration": 400,
+                                "traffic_speed": 40.0,
+                                "traffic_state": 1,
+                                "vertexes": [127.05, 37.55],  # Only 1 coordinate pair, no segments
+                            },
+                            {
+                                "name": "Road C (normal)",
+                                "distance": 5000,
+                                "duration": 400,
+                                "traffic_speed": 40.0,
+                                "traffic_state": 1,
+                                "vertexes": [127.05, 37.55, 127.1, 37.6],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    points = parse_route_points(response)
+
+    # Should have 3 points: start (Road A) + end (Road C), Road B doesn't emit any points
+    assert len(points) == 3
+
+    # First point: Road A start
+    assert points[0] == {"lat": 37.5, "lng": 127.0, "cumulative_distance_m": 0.0, "cumulative_time_sec": 0.0}
+
+    # Second point: Road A end
+    road_a_m = haversine_km(37.5, 127.0, 37.55, 127.05) * 1000
+    assert points[1]["lat"] == pytest.approx(37.55)
+    assert points[1]["lng"] == pytest.approx(127.05)
+    assert points[1]["cumulative_distance_m"] == pytest.approx(road_a_m)
+    assert points[1]["cumulative_time_sec"] == pytest.approx(600.0)
+
+    # Third point: Road C end
+    # The degenerate Road B should have added 5000m and 400s to cumulative totals
+    road_c_m = haversine_km(37.55, 127.05, 37.6, 127.1) * 1000
+    expected_cumulative_distance = road_a_m + 5000 + road_c_m  # Road A + Road B (dropped) + Road C
+    expected_cumulative_time = 600 + 400 + 400  # Road A + Road B (dropped) + Road C
+    assert points[2]["lat"] == pytest.approx(37.6)
+    assert points[2]["lng"] == pytest.approx(127.1)
+    assert points[2]["cumulative_distance_m"] == pytest.approx(expected_cumulative_distance)
+    assert points[2]["cumulative_time_sec"] == pytest.approx(expected_cumulative_time)
