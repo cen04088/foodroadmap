@@ -7,13 +7,15 @@ export interface RestaurantCardProps {
   restaurant: RestaurantResult;
   isHovered: boolean;
   onHover: (id: string | null) => void;
+  onSelect: (id: string) => void;
 }
 
-export default function RestaurantCard({ restaurant, isHovered, onHover }: RestaurantCardProps) {
+export default function RestaurantCard({ restaurant, isHovered, onHover, onSelect }: RestaurantCardProps) {
   return (
     <div
       onMouseEnter={() => onHover(restaurant.id)}
       onMouseLeave={() => onHover(null)}
+      onClick={() => onSelect(restaurant.id)}
       className={`rounded border p-3 ${isHovered ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}
     >
       <div className="flex items-baseline justify-between">

@@ -28,6 +28,7 @@ export default function Home() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const searchSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   async function runSearch(
     searchOrigin: SelectedPlace,
@@ -85,6 +86,11 @@ export default function Home() {
     setMapCenter({ lat: place.lat, lng: place.lng });
   }
 
+  function handleSelectRestaurant(id: string) {
+    setHoveredId(id);
+    mapContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <main className="flex h-screen flex-col gap-4 p-4">
       <div className="flex flex-col gap-2">
@@ -95,7 +101,7 @@ export default function Home() {
       {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
 
       <div className="flex flex-1 flex-col gap-4 overflow-hidden sm:flex-row">
-        <div className="min-h-0 sm:w-2/3">
+        <div ref={mapContainerRef} className="min-h-0 sm:w-2/3">
           <MapView
             route={result?.route.points ?? []}
             restaurants={result?.restaurants ?? []}
@@ -105,7 +111,12 @@ export default function Home() {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto sm:w-1/3">
           {result ? (
-            <RestaurantList restaurants={result.restaurants} hoveredId={hoveredId} onHover={setHoveredId} />
+            <RestaurantList
+              restaurants={result.restaurants}
+              hoveredId={hoveredId}
+              onHover={setHoveredId}
+              onSelect={handleSelectRestaurant}
+            />
           ) : (
             <p className="p-4 text-center text-gray-500">출발지와 도착지를 검색해주세요</p>
           )}

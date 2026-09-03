@@ -7,9 +7,10 @@ export interface RestaurantListProps {
   restaurants: RestaurantResult[];
   hoveredId: string | null;
   onHover: (id: string | null) => void;
+  onSelect: (id: string) => void;
 }
 
-export default function RestaurantList({ restaurants, hoveredId, onHover }: RestaurantListProps) {
+export default function RestaurantList({ restaurants, hoveredId, onHover, onSelect }: RestaurantListProps) {
   if (restaurants.length === 0) {
     return <p className="p-4 text-center text-gray-500">이 경로 근처엔 방송 맛집이 없어요</p>;
   }
@@ -22,6 +23,7 @@ export default function RestaurantList({ restaurants, hoveredId, onHover }: Rest
           restaurant={restaurant}
           isHovered={hoveredId === restaurant.id}
           onHover={onHover}
+          onSelect={onSelect}
         />
       ))}
     </div>
