@@ -20,13 +20,18 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
   const polylineRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const infoWindowRef = useRef<any>(null);
+  const centerRef = useRef(center);
+
+  useEffect(() => {
+    centerRef.current = center;
+  }, [center]);
 
   useEffect(() => {
     let cancelled = false;
     loadKakaoMapsSdk().then((kakao) => {
       if (cancelled || !containerRef.current) return;
       kakaoRef.current = kakao;
-      const initialCenter = center ?? DEFAULT_CENTER;
+      const initialCenter = centerRef.current ?? DEFAULT_CENTER;
       mapRef.current = new kakao.maps.Map(containerRef.current, {
         center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
         level: 6,
@@ -69,6 +74,11 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
     const kakao = kakaoRef.current;
     const map = mapRef.current;
     if (!kakao || !map) return;
+
+    if (infoWindowRef.current) {
+      infoWindowRef.current.close();
+      infoWindowRef.current = null;
+    }
 
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current.clear();
