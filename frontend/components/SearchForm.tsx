@@ -21,7 +21,7 @@ function PlaceInput({
   onSelect,
 }: {
   label: string;
-  onSelect: (place: SelectedPlace) => void;
+  onSelect: (place: SelectedPlace | null) => void;
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceResult[]>([]);
@@ -39,6 +39,7 @@ function PlaceInput({
   function handleQueryChange(value: string) {
     setQuery(value);
     setSelected(null);
+    onSelect(null);
     setHasSearched(false);
 
     if (debounceRef.current) {
@@ -109,9 +110,11 @@ export default function SearchForm({ onOriginSelect, onSearch, isLoading }: Sear
   const [origin, setOrigin] = useState<SelectedPlace | null>(null);
   const [destination, setDestination] = useState<SelectedPlace | null>(null);
 
-  function handleOriginSelect(place: SelectedPlace) {
+  function handleOriginSelect(place: SelectedPlace | null) {
     setOrigin(place);
-    onOriginSelect?.(place);
+    if (place) {
+      onOriginSelect?.(place);
+    }
   }
 
   function handleSubmit() {
