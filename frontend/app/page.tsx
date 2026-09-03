@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import SearchForm, { type SelectedPlace } from "../components/SearchForm";
 import FilterBar, { type Filters } from "../components/FilterBar";
 import MapView from "../components/MapView";
@@ -26,12 +26,15 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const searchSeqRef = useRef(0);
+  const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function runSearch(
     searchOrigin: SelectedPlace,
     searchDestination: SelectedPlace,
     searchFilters: Filters
   ) {
+    const seq = ++searchSeqRef.current;
     setIsLoading(true);
     setErrorMessage(null);
     try {
@@ -43,10 +46,13 @@ export default function Home() {
         broadcast: searchFilters.broadcast || undefined,
         category: searchFilters.category || undefined,
       });
+      if (seq !== searchSeqRef.current) return;
       setResult(response);
     } catch (error) {
+      if (seq !== searchSeqRef.current) return;
       setErrorMessage(errorMessageFor(error));
     } finally {
+      if (seq !== searchSeqRef.current) return;
       setIsLoading(false);
     }
   }
@@ -54,13 +60,24 @@ export default function Home() {
   function handleSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace) {
     setOrigin(searchOrigin);
     setDestination(searchDestination);
+    if (filterDebounceRef.current) {
+      clearTimeout(filterDebounceRef.current);
+      filterDebounceRef.current = null;
+    }
     runSearch(searchOrigin, searchDestination, filters);
   }
 
   function handleFiltersChange(newFilters: Filters) {
     setFilters(newFilters);
+
+    if (filterDebounceRef.current) {
+      clearTimeout(filterDebounceRef.current);
+    }
+
     if (origin && destination) {
-      runSearch(origin, destination, newFilters);
+      filterDebounceRef.current = setTimeout(() => {
+        runSearch(origin, destination, newFilters);
+      }, 400);
     }
   }
 
@@ -78,7 +95,7 @@ export default function Home() {
       {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
 
       <div className="flex flex-1 flex-col gap-4 overflow-hidden sm:flex-row">
-        <div className="sm:w-2/3">
+        <div className="min-h-0 sm:w-2/3">
           <MapView
             route={result?.route.points ?? []}
             restaurants={result?.restaurants ?? []}
@@ -86,7 +103,7 @@ export default function Home() {
             center={mapCenter}
           />
         </div>
-        <div className="sm:w-1/3 sm:overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto sm:w-1/3">
           {result ? (
             <RestaurantList restaurants={result.restaurants} hoveredId={hoveredId} onHover={setHoveredId} />
           ) : (

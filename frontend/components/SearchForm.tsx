@@ -27,13 +27,18 @@ function PlaceInput({
   const [suggestions, setSuggestions] = useState<PlaceResult[]>([]);
   const [selected, setSelected] = useState<SelectedPlace | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [sdkError, setSdkError] = useState(false);
   const kakaoRef = useRef<any>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadKakaoMapsSdk().then((kakao) => {
-      kakaoRef.current = kakao;
-    });
+    loadKakaoMapsSdk()
+      .then((kakao) => {
+        kakaoRef.current = kakao;
+      })
+      .catch(() => {
+        setSdkError(true);
+      });
   }, []);
 
   function handleQueryChange(value: string) {
@@ -100,6 +105,11 @@ function PlaceInput({
       {query && hasSearched && suggestions.length === 0 && !selected && (
         <div className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow-lg">
           검색 결과가 없어요
+        </div>
+      )}
+      {sdkError && (
+        <div className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow-lg">
+          장소 검색을 사용할 수 없어요
         </div>
       )}
     </div>

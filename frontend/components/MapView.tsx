@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
 import type { RestaurantResult, RoutePoint } from "../lib/api";
+import { formatDuration } from "../lib/format";
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 export interface MapViewProps {
   route: RoutePoint[];
@@ -21,6 +31,7 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
   const markersRef = useRef<Map<string, any>>(new Map());
   const infoWindowRef = useRef<any>(null);
   const centerRef = useRef(center);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     centerRef.current = center;
@@ -28,15 +39,20 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
 
   useEffect(() => {
     let cancelled = false;
-    loadKakaoMapsSdk().then((kakao) => {
-      if (cancelled || !containerRef.current) return;
-      kakaoRef.current = kakao;
-      const initialCenter = centerRef.current ?? DEFAULT_CENTER;
-      mapRef.current = new kakao.maps.Map(containerRef.current, {
-        center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
-        level: 6,
+    loadKakaoMapsSdk()
+      .then((kakao) => {
+        if (cancelled || !containerRef.current) return;
+        kakaoRef.current = kakao;
+        const initialCenter = centerRef.current ?? DEFAULT_CENTER;
+        mapRef.current = new kakao.maps.Map(containerRef.current, {
+          center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
+          level: 6,
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoadError(true);
       });
-    });
     return () => {
       cancelled = true;
     };
@@ -94,8 +110,8 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
         }
         infoWindowRef.current = new kakao.maps.InfoWindow({
           content: `<div style="padding:8px;font-size:13px;">
-            <strong>${restaurant.name}</strong><br/>
-            ${restaurant.distance_from_route_km.toFixed(1)}km · ${Math.floor(restaurant.cumulative_time_sec / 60)}분 지점
+            <strong>${escapeHtml(restaurant.name)}</strong><br/>
+            ${restaurant.distance_from_route_km.toFixed(1)}km · ${formatDuration(restaurant.cumulative_time_sec)} 지점
           </div>`,
         });
         infoWindowRef.current.open(map, marker);
@@ -111,6 +127,14 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
     if (!marker || !map) return;
     map.panTo(marker.getPosition());
   }, [highlightedRestaurantId]);
+
+  if (loadError) {
+    return (
+      <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded bg-gray-100 text-sm text-gray-500">
+        지도를 불러오지 못했습니다
+      </div>
+    );
+  }
 
   return <div ref={containerRef} className="h-full min-h-[400px] w-full rounded" />;
 }

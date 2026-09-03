@@ -17,6 +17,7 @@ export function loadKakaoMapsSdk(): Promise<any> {
   sdkPromise = new Promise((resolve, reject) => {
     const appKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
     if (!appKey) {
+      sdkPromise = null;
       reject(new Error("NEXT_PUBLIC_KAKAO_JS_KEY 환경변수가 설정되지 않았습니다"));
       return;
     }
@@ -24,7 +25,10 @@ export function loadKakaoMapsSdk(): Promise<any> {
     const script = document.createElement("script");
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
     script.async = true;
-    script.onerror = () => reject(new Error("카카오맵 SDK 로드에 실패했습니다"));
+    script.onerror = () => {
+      sdkPromise = null;
+      reject(new Error("카카오맵 SDK 로드에 실패했습니다"));
+    };
     script.onload = () => {
       window.kakao.maps.load(() => resolve(window.kakao));
     };
