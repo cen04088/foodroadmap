@@ -1,7 +1,7 @@
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Broadcast, Restaurant
+from app.models import Broadcast, Restaurant, restaurant_broadcasts
 
 
 def query_candidate_restaurants(
@@ -30,3 +30,24 @@ def query_candidate_restaurants(
         )
 
     return list(session.scalars(stmt).unique())
+
+
+def list_broadcasts_with_counts(session: Session) -> list[dict]:
+    counts_subquery = (
+        select(
+            restaurant_broadcasts.c.broadcast_id,
+            func.count(restaurant_broadcasts.c.restaurant_id).label("count"),
+        )
+        .join(Restaurant, Restaurant.id == restaurant_broadcasts.c.restaurant_id)
+        .where(Restaurant.latitude.is_not(None), Restaurant.longitude.is_not(None))
+        .group_by(restaurant_broadcasts.c.broadcast_id)
+        .subquery()
+    )
+
+    stmt = select(Broadcast.id, Broadcast.name, func.coalesce(counts_subquery.c.count, 0)).outerjoin(
+        counts_subquery, counts_subquery.c.broadcast_id == Broadcast.id
+    )
+
+    return [
+        {"slug": slug, "name": name, "count": count} for slug, name, count in session.execute(stmt)
+    ]

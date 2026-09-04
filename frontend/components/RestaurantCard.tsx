@@ -2,6 +2,7 @@
 
 import { formatDistance, formatDuration } from "../lib/format";
 import type { RestaurantResult } from "../lib/api";
+import { getBroadcastColor } from "../lib/broadcastColors";
 
 export interface RestaurantCardProps {
   restaurant: RestaurantResult;
@@ -44,7 +45,8 @@ export default function RestaurantCard({ restaurant, isHovered, onHover, onSelec
           {restaurant.broadcasts.map((b) => (
             <span
               key={b}
-              className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-soft-ink"
+              style={{ backgroundColor: getBroadcastColor(b).color }}
+              className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
             >
               {b}
             </span>

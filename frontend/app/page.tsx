@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import SearchForm, { type SelectedPlace } from "../components/SearchForm";
 import FilterBar, { type Filters } from "../components/FilterBar";
 import MapView from "../components/MapView";
@@ -17,10 +19,14 @@ function errorMessageFor(error: unknown): string {
   return "알 수 없는 오류가 발생했습니다";
 }
 
-export default function Home() {
+function HomeContent() {
+  const searchParams = useSearchParams();
   const [origin, setOrigin] = useState<SelectedPlace | null>(null);
   const [destination, setDestination] = useState<SelectedPlace | null>(null);
-  const [filters, setFilters] = useState<Filters>({ broadcast: "", category: "" });
+  const [filters, setFilters] = useState<Filters>(() => ({
+    broadcast: searchParams.get("broadcast") ?? "",
+    category: "",
+  }));
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -93,6 +99,13 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex h-screen w-full max-w-[1400px] flex-col gap-4 p-4 sm:gap-5 sm:p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-ink">경로 맛집</h1>
+        <Link href="/broadcasts" className="text-sm text-ink-muted transition hover:text-ink">
+          방송·유튜브별로 보기
+        </Link>
+      </div>
+
       <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-black/5 sm:p-5">
         <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
         <div className="my-4 border-t border-line" />
@@ -112,6 +125,7 @@ export default function Home() {
             restaurants={result?.restaurants ?? []}
             highlightedRestaurantId={hoveredId}
             center={mapCenter}
+            activeBroadcast={filters.broadcast || null}
           />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto sm:w-2/5">
@@ -130,5 +144,13 @@ export default function Home() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }

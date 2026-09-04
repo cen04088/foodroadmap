@@ -3,7 +3,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import init_db, make_session_factory
 from app.models import Broadcast, Restaurant
-from app.repository import query_candidate_restaurants
+from app.repository import list_broadcasts_with_counts, query_candidate_restaurants
 
 
 def make_session_factory_in_memory():
@@ -85,3 +85,28 @@ def test_query_candidate_restaurants_filters_by_broadcast_display_name():
 
         assert {r.id for r in by_name} == {"inside"}
         assert {r.id for r in by_name} == {r.id for r in by_slug}
+
+
+def test_list_broadcasts_with_counts_counts_only_restaurants_with_coordinates():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        ttoganjib = Broadcast(id="ttoganjib", name="또간집")
+        empty_show = Broadcast(id="empty", name="텅빈방송")
+        session.add_all([ttoganjib, empty_show])
+
+        with_coords = Restaurant(id="with-coords", name="WithCoords", latitude=37.5, longitude=127.0)
+        with_coords.broadcasts.append(ttoganjib)
+
+        without_coords = Restaurant(id="without-coords", name="WithoutCoords", latitude=None, longitude=None)
+        without_coords.broadcasts.append(ttoganjib)
+
+        session.add_all([with_coords, without_coords])
+        session.commit()
+
+        results = list_broadcasts_with_counts(session)
+
+        by_slug = {r["slug"]: r for r in results}
+        assert by_slug["ttoganjib"]["name"] == "또간집"
+        assert by_slug["ttoganjib"]["count"] == 1
+        assert by_slug["empty"]["name"] == "텅빈방송"
+        assert by_slug["empty"]["count"] == 0

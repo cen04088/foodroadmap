@@ -6,7 +6,7 @@ from app.db import make_engine, make_session_factory
 from app.geo import bounding_box_with_margin
 from app.kakao.directions import KakaoDirectionsError, fetch_route, parse_route_points, parse_route_summary
 from app.matching import RestaurantMatch, match_restaurants_to_route
-from app.repository import query_candidate_restaurants
+from app.repository import list_broadcasts_with_counts, query_candidate_restaurants
 
 router = APIRouter()
 
@@ -44,6 +44,11 @@ def _serialize_match(match: RestaurantMatch) -> dict:
         "cumulative_time_sec": round(match.cumulative_time_sec),
         "broadcasts": [b.name for b in restaurant.broadcasts],
     }
+
+
+@router.get("/api/broadcasts")
+def get_broadcasts(session: Session = Depends(get_session)):
+    return {"broadcasts": list_broadcasts_with_counts(session)}
 
 
 @router.get("/api/route-restaurants")

@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
 import type { RestaurantResult, RoutePoint } from "../lib/api";
 import { formatDuration } from "../lib/format";
+import { getBroadcastColor } from "../lib/broadcastColors";
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청
+const MARKER_SIZE = 30;
 
 function escapeHtml(value: string): string {
   return value
@@ -16,14 +18,35 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
+// 활성 방송 필터에 해당하는 방송이 있으면 그 방송, 없으면 첫 번째 방송 기준으로 마커 색을 정한다.
+function pickBroadcastName(restaurant: RestaurantResult, activeBroadcast: string | null): string | null {
+  if (activeBroadcast && restaurant.broadcasts.includes(activeBroadcast)) {
+    return activeBroadcast;
+  }
+  return restaurant.broadcasts[0] ?? null;
+}
+
+function markerImageDataUrl(color: string, letter: string): string {
+  const size = MARKER_SIZE;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="${color}" stroke="white" stroke-width="2"/><text x="${size / 2}" y="${size / 2 + 5}" font-family="Pretendard, sans-serif" font-size="13" font-weight="700" fill="white" text-anchor="middle">${letter}</text></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
 export interface MapViewProps {
   route: RoutePoint[];
   restaurants: RestaurantResult[];
   highlightedRestaurantId: string | null;
   center: { lat: number; lng: number } | null;
+  activeBroadcast?: string | null;
 }
 
-export default function MapView({ route, restaurants, highlightedRestaurantId, center }: MapViewProps) {
+export default function MapView({
+  route,
+  restaurants,
+  highlightedRestaurantId,
+  center,
+  activeBroadcast = null,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const kakaoRef = useRef<any>(null);
@@ -100,8 +123,16 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
     markersRef.current.clear();
 
     restaurants.forEach((restaurant) => {
+      const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
+      const { color, letter } = getBroadcastColor(broadcastName ?? "");
+      const markerImage = new kakao.maps.MarkerImage(
+        markerImageDataUrl(color, letter),
+        new kakao.maps.Size(MARKER_SIZE, MARKER_SIZE),
+        { offset: new kakao.maps.Point(MARKER_SIZE / 2, MARKER_SIZE / 2) }
+      );
       const marker = new kakao.maps.Marker({
         position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
+        image: markerImage,
         map,
       });
       kakao.maps.event.addListener(marker, "click", () => {
@@ -118,7 +149,7 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
       });
       markersRef.current.set(restaurant.id, marker);
     });
-  }, [restaurants]);
+  }, [restaurants, activeBroadcast]);
 
   useEffect(() => {
     if (!highlightedRestaurantId) return;
