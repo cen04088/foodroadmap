@@ -79,8 +79,8 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
       polylineRef.current = new kakao.maps.Polyline({
         path,
         strokeWeight: 4,
-        strokeColor: "#2563eb",
-        strokeOpacity: 0.8,
+        strokeColor: "#EA580C",
+        strokeOpacity: 0.85,
       });
       polylineRef.current.setMap(map);
     }
@@ -109,9 +109,9 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
           infoWindowRef.current.close();
         }
         infoWindowRef.current = new kakao.maps.InfoWindow({
-          content: `<div style="padding:8px;font-size:13px;">
-            <strong>${escapeHtml(restaurant.name)}</strong><br/>
-            ${restaurant.distance_from_route_km.toFixed(1)}km · ${formatDuration(restaurant.cumulative_time_sec)} 지점
+          content: `<div style="padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;min-width:120px;">
+            <div style="font-size:13px;font-weight:600;color:#1c1917;">${escapeHtml(restaurant.name)}</div>
+            <div style="margin-top:2px;font-size:12px;color:#78716c;">${restaurant.distance_from_route_km.toFixed(1)}km · ${formatDuration(restaurant.cumulative_time_sec)} 지점</div>
           </div>`,
         });
         infoWindowRef.current.open(map, marker);
@@ -130,11 +130,15 @@ export default function MapView({ route, restaurants, highlightedRestaurantId, c
 
   if (loadError) {
     return (
-      <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded bg-gray-100 text-sm text-gray-500">
+      <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded-2xl border border-line bg-surface text-sm text-ink-muted">
         지도를 불러오지 못했습니다
       </div>
     );
   }
 
-  return <div ref={containerRef} className="h-full min-h-[400px] w-full rounded" />;
+  return (
+    <div className="h-full min-h-[400px] w-full overflow-hidden rounded-2xl border border-line shadow-sm shadow-black/5">
+      <div ref={containerRef} className="h-full w-full" />
+    </div>
+  );
 }

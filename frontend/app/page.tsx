@@ -92,16 +92,21 @@ export default function Home() {
   }
 
   return (
-    <main className="flex h-screen flex-col gap-4 p-4">
-      <div className="flex flex-col gap-2">
+    <main className="mx-auto flex h-screen w-full max-w-[1400px] flex-col gap-4 p-4 sm:gap-5 sm:p-6">
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-black/5 sm:p-5">
         <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
+        <div className="my-4 border-t border-line" />
         <FilterBar filters={filters} onChange={handleFiltersChange} />
       </div>
 
-      {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
+      {errorMessage && (
+        <div className="rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
+          {errorMessage}
+        </div>
+      )}
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden sm:flex-row">
-        <div ref={mapContainerRef} className="min-h-0 sm:w-2/3">
+      <div className="flex flex-1 flex-col gap-4 overflow-hidden sm:flex-row sm:gap-5">
+        <div ref={mapContainerRef} className="min-h-0 sm:w-3/5">
           <MapView
             route={result?.route.points ?? []}
             restaurants={result?.restaurants ?? []}
@@ -109,7 +114,7 @@ export default function Home() {
             center={mapCenter}
           />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto sm:w-1/3">
+        <div className="min-h-0 flex-1 overflow-y-auto sm:w-2/5">
           {result ? (
             <RestaurantList
               restaurants={result.restaurants}
@@ -118,7 +123,9 @@ export default function Home() {
               onSelect={handleSelectRestaurant}
             />
           ) : (
-            <p className="p-4 text-center text-gray-500">출발지와 도착지를 검색해주세요</p>
+            <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted">
+              출발지와 도착지를 검색해주세요
+            </div>
           )}
         </div>
       </div>
