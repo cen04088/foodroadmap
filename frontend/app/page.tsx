@@ -11,51 +11,6 @@ import RestaurantDetail from "../components/RestaurantDetail";
 import { ApiError, fetchRouteRestaurants, type RouteRestaurantsResponse } from "../lib/api";
 import { formatDuration } from "../lib/format";
 
-function JourneyBar({
-  restaurants,
-  origin,
-  destination,
-  onSelect,
-}: {
-  restaurants: RouteRestaurantsResponse["restaurants"];
-  origin: SelectedPlace | null;
-  destination: SelectedPlace | null;
-  onSelect: (id: string) => void;
-}) {
-  const stops = restaurants.slice(0, 4);
-  if (!origin || !destination || stops.length === 0) return null;
-
-  return (
-    <section className="pointer-events-auto absolute inset-x-4 bottom-4 z-20 hidden rounded-2xl border border-white/10 bg-[#171310]/95 px-5 py-4 shadow-2xl shadow-black/30 backdrop-blur-xl lg:block">
-      <div className="mb-3 flex items-center justify-between gap-4 text-xs">
-        <span className="max-w-[180px] truncate font-semibold text-[#fff7ed]">{origin.label}</span>
-        <span className="text-[#a89c91]">가는 길에 만나는 방송 맛집</span>
-        <span className="max-w-[180px] truncate text-right font-semibold text-[#fff7ed]">{destination.label}</span>
-      </div>
-      <div className="relative grid grid-cols-[auto_1fr_auto] items-start gap-4">
-        <div className="pt-3 text-xs font-medium text-[#ffb45a]">출발</div>
-        <div className="relative flex min-w-0 justify-between before:absolute before:left-0 before:right-0 before:top-4 before:h-1 before:rounded-full before:bg-[#5c4736]">
-          {stops.map((restaurant, index) => (
-            <button
-              key={restaurant.id}
-              type="button"
-              onClick={() => onSelect(restaurant.id)}
-              className="group relative z-10 flex w-24 flex-col items-center text-center"
-            >
-              <span className="mb-2 grid h-8 w-8 place-items-center rounded-full border-2 border-[#171310] bg-[#ff7a1a] text-sm font-bold text-[#171310] shadow-lg transition group-hover:scale-110">
-                {index + 1}
-              </span>
-              <span className="whitespace-nowrap text-xs font-semibold text-[#fff7ed]">{formatDuration(restaurant.cumulative_time_sec)} 후</span>
-              <span className="mt-0.5 max-w-24 truncate text-[11px] text-[#a89c91]">{restaurant.name}</span>
-            </button>
-          ))}
-        </div>
-        <div className="pt-3 text-xs font-medium text-[#ffb45a]">도착</div>
-      </div>
-    </section>
-  );
-}
-
 function errorMessageFor(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 0) return "서버에 연결할 수 없습니다";
@@ -233,7 +188,6 @@ function HomeContent() {
           </div>
         </div>
       </div>
-      {result && <JourneyBar restaurants={result.restaurants} origin={origin} destination={destination} onSelect={handleSelectRestaurant} />}
     </main>
   );
 }
