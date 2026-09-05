@@ -7,8 +7,8 @@ import { formatDuration } from "../lib/format";
 import { getBroadcastColor } from "../lib/broadcastColors";
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청
-const MARKER_WIDTH = 46;
-const MARKER_HEIGHT = 54;
+const MARKER_SIZE = 30;
+const MARKER_SIZE_HIGHLIGHTED = 38;
 
 function escapeHtml(value: string): string {
   return value
@@ -28,8 +28,14 @@ function pickBroadcastName(restaurant: RestaurantResult, activeBroadcast: string
 }
 
 function markerImageDataUrl(color: string, letter: string, isHighlighted: boolean): string {
-  const ring = isHighlighted ? "#FFB45A" : color;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${MARKER_WIDTH}" height="${MARKER_HEIGHT}" viewBox="0 0 ${MARKER_WIDTH} ${MARKER_HEIGHT}"><path d="M23 51C23 51 6 34 6 21a17 17 0 1 1 34 0c0 13-17 30-17 30Z" fill="#FF7A1A" stroke="${ring}" stroke-width="3"/><circle cx="23" cy="21" r="11" fill="#171310"/><text x="23" y="26" font-family="Pretendard, sans-serif" font-size="14" font-weight="800" fill="#FFF7ED" text-anchor="middle">${letter}</text></svg>`;
+  const size = isHighlighted ? MARKER_SIZE_HIGHLIGHTED : MARKER_SIZE;
+  const ringColor = isHighlighted ? "#FF7A1A" : "#FFFFFF";
+  const ringWidth = isHighlighted ? 3 : 2;
+  const r = size / 2 - ringWidth;
+  const fontSize = Math.round(size * 0.42);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${
+    isHighlighted ? `<circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="${color}" opacity="0.25"/>` : ""
+  }<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="${color}" stroke="${ringColor}" stroke-width="${ringWidth}"/><text x="${size / 2}" y="${size / 2 + fontSize * 0.35}" font-family="Pretendard, sans-serif" font-size="${fontSize}" font-weight="800" fill="#FFFFFF" text-anchor="middle">${letter}</text></svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
@@ -133,10 +139,12 @@ export default function MapView({
     restaurants.forEach((restaurant, index) => {
       const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
       const { color, letter } = getBroadcastColor(broadcastName ?? "");
+      const isHighlighted = highlightedRestaurantId === restaurant.id;
+      const size = isHighlighted ? MARKER_SIZE_HIGHLIGHTED : MARKER_SIZE;
       const markerImage = new kakao.maps.MarkerImage(
-        markerImageDataUrl(color, letter, highlightedRestaurantId === restaurant.id),
-        new kakao.maps.Size(MARKER_WIDTH, MARKER_HEIGHT),
-        { offset: new kakao.maps.Point(MARKER_WIDTH / 2, MARKER_HEIGHT) }
+        markerImageDataUrl(color, letter, isHighlighted),
+        new kakao.maps.Size(size, size),
+        { offset: new kakao.maps.Point(size / 2, size / 2) }
       );
       const marker = new kakao.maps.Marker({
         position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
