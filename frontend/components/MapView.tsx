@@ -7,7 +7,8 @@ import { formatDuration } from "../lib/format";
 import { getBroadcastColor } from "../lib/broadcastColors";
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청
-const MARKER_SIZE = 30;
+const MARKER_WIDTH = 46;
+const MARKER_HEIGHT = 54;
 
 function escapeHtml(value: string): string {
   return value
@@ -26,9 +27,9 @@ function pickBroadcastName(restaurant: RestaurantResult, activeBroadcast: string
   return restaurant.broadcasts[0] ?? null;
 }
 
-function markerImageDataUrl(color: string, letter: string): string {
-  const size = MARKER_SIZE;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="${color}" stroke="white" stroke-width="2"/><text x="${size / 2}" y="${size / 2 + 5}" font-family="Pretendard, sans-serif" font-size="13" font-weight="700" fill="white" text-anchor="middle">${letter}</text></svg>`;
+function markerImageDataUrl(color: string, order: number, isHighlighted: boolean): string {
+  const ring = isHighlighted ? "#FFB45A" : color;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${MARKER_WIDTH}" height="${MARKER_HEIGHT}" viewBox="0 0 ${MARKER_WIDTH} ${MARKER_HEIGHT}"><path d="M23 51C23 51 6 34 6 21a17 17 0 1 1 34 0c0 13-17 30-17 30Z" fill="#FF7A1A" stroke="${ring}" stroke-width="3"/><circle cx="23" cy="21" r="11" fill="#171310"/><text x="23" y="26" font-family="Pretendard, sans-serif" font-size="14" font-weight="800" fill="#FFF7ED" text-anchor="middle">${order}</text></svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
@@ -108,8 +109,8 @@ export default function MapView({
       const path = route.map((p) => new kakao.maps.LatLng(p.lat, p.lng));
       polylineRef.current = new kakao.maps.Polyline({
         path,
-        strokeWeight: 4,
-        strokeColor: "#EA580C",
+      strokeWeight: 5,
+      strokeColor: "#FF7A1A",
         strokeOpacity: 0.85,
       });
       polylineRef.current.setMap(map);
@@ -129,13 +130,13 @@ export default function MapView({
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current.clear();
 
-    restaurants.forEach((restaurant) => {
+    restaurants.forEach((restaurant, index) => {
       const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
-      const { color, letter } = getBroadcastColor(broadcastName ?? "");
+      const { color } = getBroadcastColor(broadcastName ?? "");
       const markerImage = new kakao.maps.MarkerImage(
-        markerImageDataUrl(color, letter),
-        new kakao.maps.Size(MARKER_SIZE, MARKER_SIZE),
-        { offset: new kakao.maps.Point(MARKER_SIZE / 2, MARKER_SIZE / 2) }
+        markerImageDataUrl(color, index + 1, highlightedRestaurantId === restaurant.id),
+        new kakao.maps.Size(MARKER_WIDTH, MARKER_HEIGHT),
+        { offset: new kakao.maps.Point(MARKER_WIDTH / 2, MARKER_HEIGHT) }
       );
       const marker = new kakao.maps.Marker({
         position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
@@ -148,8 +149,9 @@ export default function MapView({
         }
         infoWindowRef.current = new kakao.maps.InfoWindow({
           content: `<div style="padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;min-width:120px;">
-            <div style="font-size:13px;font-weight:600;color:#1c1917;">${escapeHtml(restaurant.name)}</div>
-            <div style="margin-top:2px;font-size:12px;color:#78716c;">${restaurant.distance_from_route_km.toFixed(1)}km · ${formatDuration(restaurant.cumulative_time_sec)} 지점</div>
+            <div style="font-size:12px;font-weight:700;color:#ff7a1a;">${index + 1}번째 STOP · ${escapeHtml(broadcastName ?? "방송 맛집")}</div>
+            <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;">${escapeHtml(restaurant.name)}</div>
+            <div style="margin-top:3px;font-size:12px;color:#78716c;">출발 후 ${formatDuration(restaurant.cumulative_time_sec)} · 경로에서 ${restaurant.distance_from_route_km.toFixed(1)}km</div>
           </div>`,
         });
         infoWindowRef.current.open(map, marker);
@@ -157,7 +159,7 @@ export default function MapView({
       });
       markersRef.current.set(restaurant.id, marker);
     });
-  }, [restaurants, activeBroadcast]);
+  }, [restaurants, activeBroadcast, highlightedRestaurantId]);
 
   useEffect(() => {
     if (!highlightedRestaurantId) return;

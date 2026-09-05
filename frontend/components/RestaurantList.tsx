@@ -36,7 +36,7 @@ export default function RestaurantList({
 
   return (
     <div className="flex flex-col gap-3 overflow-y-auto">
-      {restaurants.map((restaurant) => (
+      {restaurants.map((restaurant, index) => (
         <div
           key={restaurant.id}
           ref={(el) => {
@@ -46,6 +46,7 @@ export default function RestaurantList({
         >
           <RestaurantCard
             restaurant={restaurant}
+            order={index + 1}
             isSelected={selectedId === restaurant.id}
             onSelect={onSelect}
             onShowDetail={onShowDetail}

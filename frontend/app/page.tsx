@@ -9,6 +9,52 @@ import MapView from "../components/MapView";
 import RestaurantList from "../components/RestaurantList";
 import RestaurantDetail from "../components/RestaurantDetail";
 import { ApiError, fetchRouteRestaurants, type RouteRestaurantsResponse } from "../lib/api";
+import { formatDuration } from "../lib/format";
+
+function JourneyBar({
+  restaurants,
+  origin,
+  destination,
+  onSelect,
+}: {
+  restaurants: RouteRestaurantsResponse["restaurants"];
+  origin: SelectedPlace | null;
+  destination: SelectedPlace | null;
+  onSelect: (id: string) => void;
+}) {
+  const stops = restaurants.slice(0, 4);
+  if (!origin || !destination || stops.length === 0) return null;
+
+  return (
+    <section className="pointer-events-auto absolute inset-x-4 bottom-4 z-20 hidden rounded-2xl border border-white/10 bg-[#171310]/95 px-5 py-4 shadow-2xl shadow-black/30 backdrop-blur-xl lg:block">
+      <div className="mb-3 flex items-center justify-between gap-4 text-xs">
+        <span className="max-w-[180px] truncate font-semibold text-[#fff7ed]">{origin.label}</span>
+        <span className="text-[#a89c91]">가는 길에 만나는 방송 맛집</span>
+        <span className="max-w-[180px] truncate text-right font-semibold text-[#fff7ed]">{destination.label}</span>
+      </div>
+      <div className="relative grid grid-cols-[auto_1fr_auto] items-start gap-4">
+        <div className="pt-3 text-xs font-medium text-[#ffb45a]">출발</div>
+        <div className="relative flex min-w-0 justify-between before:absolute before:left-0 before:right-0 before:top-4 before:h-1 before:rounded-full before:bg-[#5c4736]">
+          {stops.map((restaurant, index) => (
+            <button
+              key={restaurant.id}
+              type="button"
+              onClick={() => onSelect(restaurant.id)}
+              className="group relative z-10 flex w-24 flex-col items-center text-center"
+            >
+              <span className="mb-2 grid h-8 w-8 place-items-center rounded-full border-2 border-[#171310] bg-[#ff7a1a] text-sm font-bold text-[#171310] shadow-lg transition group-hover:scale-110">
+                {index + 1}
+              </span>
+              <span className="whitespace-nowrap text-xs font-semibold text-[#fff7ed]">{formatDuration(restaurant.cumulative_time_sec)} 후</span>
+              <span className="mt-0.5 max-w-24 truncate text-[11px] text-[#a89c91]">{restaurant.name}</span>
+            </button>
+          ))}
+        </div>
+        <div className="pt-3 text-xs font-medium text-[#ffb45a]">도착</div>
+      </div>
+    </section>
+  );
+}
 
 function errorMessageFor(error: unknown): string {
   if (error instanceof ApiError) {
@@ -114,8 +160,10 @@ function HomeContent() {
 
   const detailRestaurant = detailId ? result?.restaurants.find((r) => r.id === detailId) ?? null : null;
 
+  const isJourneyReady = Boolean(result && origin && destination);
+
   return (
-    <main className="relative flex w-full flex-col sm:h-screen">
+    <main className="relative flex min-h-screen w-full flex-col overflow-hidden sm:h-screen sm:min-h-0">
       {/* 지도 — 데스크톱에서는 화면 전체를 채우는 배경, 모바일에서는 지금처럼 목록 위에 고정 높이로 위치 */}
       <div ref={mapContainerRef} className="order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
         <MapView
@@ -130,18 +178,30 @@ function HomeContent() {
 
       {/* 검색+필터+목록 — 모바일에서는 지금처럼 세로로 쌓이고(display: contents로 위 지도 사이에 끼워짐),
           데스크톱에서는 지도 위에 뜨는 좌측 사이드바 하나로 묶인다. */}
-      <div className="contents sm:pointer-events-none sm:absolute sm:inset-y-6 sm:left-6 sm:z-10 sm:flex sm:w-[400px] sm:flex-col sm:gap-4">
+      <header className="pointer-events-none relative z-20 flex items-center justify-between bg-[#171310]/95 px-5 py-4 text-[#fff7ed] shadow-lg shadow-black/10 backdrop-blur-xl sm:absolute sm:inset-x-0 sm:top-0 sm:bg-[#171310]/85 sm:px-7">
+        <Link href="/" className="pointer-events-auto text-xl font-black tracking-[-0.06em] text-[#ffb45a]">FOODMAP</Link>
+        <nav className="pointer-events-auto flex items-center gap-4 text-sm text-[#a89c91] sm:gap-6">
+          <span className="hidden sm:inline">미식 로드트립</span>
+          <Link href="/broadcasts" className="transition hover:text-[#fff7ed]">프로그램</Link>
+        </nav>
+      </header>
+
+      <div className="contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[390px] sm:flex-col sm:gap-3">
         <div className="order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
-          <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-black/5 sm:shadow-lg sm:shadow-black/10">
-            <div className="mb-4 flex items-center justify-between">
-              <h1 className="text-lg font-semibold text-ink">경로 맛집</h1>
-              <Link href="/broadcasts" className="text-sm text-ink-muted transition hover:text-ink">
-                방송·유튜브별로 보기
-              </Link>
+          <div className="rounded-2xl border border-white/10 bg-[#29201a]/95 p-5 shadow-xl shadow-black/25 backdrop-blur-xl">
+            <div className="mb-5">
+              <p className="text-xs font-bold tracking-[0.16em] text-[#ffb45a]">MY FOOD ROAD</p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight text-[#fff7ed]">{isJourneyReady ? "가는 길의 맛집" : "오늘의 미식 로드트립"}</h1>
+              <p className="mt-1 text-sm text-[#a89c91]">{isJourneyReady ? "시간순으로 들를 곳을 골라보세요" : "목적지까지 가는 길이, 맛집 여행이 됩니다."}</p>
             </div>
             <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
-            <div className="my-4 border-t border-line" />
-            <FilterBar filters={filters} onChange={handleFiltersChange} />
+            {!isJourneyReady && (
+              <div className="mt-5 border-t border-white/10 pt-4">
+                <p className="mb-2 text-xs font-medium text-[#a89c91]">추천 반경 <span className="ml-2 text-[#ffb45a]">2km</span></p>
+                <div className="flex gap-2 text-xs"><span className="rounded-full bg-[#ff7a1a]/15 px-3 py-1.5 text-[#ffb45a]">● 1km</span><span className="rounded-full bg-[#ff7a1a] px-3 py-1.5 font-semibold text-[#171310]">● 2km</span><span className="rounded-full bg-white/5 px-3 py-1.5 text-[#a89c91]">○ 3km</span></div>
+              </div>
+            )}
+            {isJourneyReady && <><div className="my-4 border-t border-white/10" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
           </div>
         </div>
 
@@ -154,25 +214,26 @@ function HomeContent() {
         )}
 
         <div className="order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
-          <div className="sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-line sm:bg-surface sm:p-3 sm:shadow-lg sm:shadow-black/10">
+          <div className="sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl">
             {detailRestaurant ? (
               <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
             ) : result ? (
-              <RestaurantList
-                restaurants={result.restaurants}
-                selectedId={selectedId}
-                onSelect={handleSelectRestaurant}
-                onShowDetail={handleShowDetail}
-                scrollToId={listScrollTarget}
-              />
+              <>
+                <div className="mb-3 flex items-center justify-between px-1 pt-1 text-sm">
+                  <span className="font-semibold text-[#fff7ed]">{origin?.label} <span className="text-[#a89c91]">→</span> {destination?.label}</span>
+                  <span className="text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
+                </div>
+                <RestaurantList restaurants={result.restaurants} selectedId={selectedId} onSelect={handleSelectRestaurant} onShowDetail={handleShowDetail} scrollToId={listScrollTarget} />
+              </>
             ) : (
-              <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted sm:border-none">
-                출발지와 도착지를 검색해주세요
+              <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-white/10 px-4 text-center text-sm text-[#a89c91] sm:border-none">
+                출발지와 목적지를 정하면, 가는 길의 방송 맛집을 시간순으로 안내해드려요.
               </div>
             )}
           </div>
         </div>
       </div>
+      {result && <JourneyBar restaurants={result.restaurants} origin={origin} destination={destination} onSelect={handleSelectRestaurant} />}
     </main>
   );
 }

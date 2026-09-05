@@ -104,6 +104,21 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
       </button>
 
       <div className="mt-2 flex-1 overflow-y-auto pb-1">
+        {videoId && (
+          <button
+            type="button"
+            onClick={() => setShowVideo(true)}
+            className="group relative mb-4 block aspect-video w-full overflow-hidden rounded-xl bg-[#171310] text-left"
+          >
+            <span
+              role="img"
+              aria-label={`${restaurant.name} 방송 영상`}
+              className="block h-full w-full bg-cover bg-center opacity-70 transition duration-300 group-hover:scale-105 group-hover:opacity-50"
+              style={{ backgroundImage: `url(https://i.ytimg.com/vi/${videoId}/hqdefault.jpg)` }}
+            />
+            <span className="absolute inset-0 grid place-items-center"><span className="rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-bold text-[#171310] shadow-lg">▶ 방송 영상 보기</span></span>
+          </button>
+        )}
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold leading-snug text-ink">{restaurant.name}</h2>
           {restaurant.category && (
@@ -128,8 +143,8 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
         )}
 
         <div className="mt-4 rounded-xl bg-accent-soft px-4 py-3 text-sm text-ink">
-          경로에서 {formatDistance(restaurant.distance_from_route_km)} · 출발 후{" "}
-          {formatDuration(restaurant.cumulative_time_sec)} 지점
+          <span className="font-bold text-accent-soft-ink">🚗 출발 후 {formatDuration(restaurant.cumulative_time_sec)}</span>
+          <span className="text-ink-muted"> · 경로에서 {formatDistance(restaurant.distance_from_route_km)}</span>
         </div>
 
         <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4">
