@@ -42,12 +42,16 @@ def _fetch_with_deadline(url: str, timeout: float = FETCH_DEADLINE_SECONDS) -> s
     return outcome["html"]
 
 
-def backfill_youtube_urls(session_factory=None) -> None:
+def backfill_youtube_urls(session_factory=None, limit: int | None = None) -> None:
     """One-off backfill for restaurants crawled before youtube_url existed.
 
     Re-fetches each restaurant's place detail page (already-known external_id,
     no list-page pagination needed) and fills in youtube_url where matzipmap
     has one. Safe to re-run: only touches rows still missing a youtube_url.
+
+    `limit` caps how many restaurants a single call processes -- useful to
+    run the backfill as a series of small, independently-observable batches
+    instead of one long-lived process.
     """
     engine = None
     if session_factory is None:
@@ -59,6 +63,9 @@ def backfill_youtube_urls(session_factory=None) -> None:
             external_ids = [
                 r.id for r in session.query(Restaurant).filter(Restaurant.youtube_url.is_(None)).all()
             ]
+
+        if limit is not None:
+            external_ids = external_ids[:limit]
 
         total = len(external_ids)
         logger.info("backfilling youtube_url for %d restaurants", total)
@@ -84,7 +91,7 @@ def backfill_youtube_urls(session_factory=None) -> None:
                     session.commit()
                     updated += 1
 
-            if (i + 1) % 50 == 0:
+            if (i + 1) % 10 == 0:
                 logger.info("progress: %d/%d checked, %d matched so far", i + 1, total, updated)
 
         logger.info("youtube backfill complete: %d/%d restaurants updated", updated, total)
@@ -94,5 +101,8 @@ def backfill_youtube_urls(session_factory=None) -> None:
 
 
 if __name__ == "__main__":
+    import sys
+
     logging.basicConfig(level=logging.INFO)
-    backfill_youtube_urls()
+    cli_limit = int(sys.argv[1]) if len(sys.argv) > 1 else None
+    backfill_youtube_urls(limit=cli_limit)

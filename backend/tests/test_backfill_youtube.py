@@ -78,6 +78,33 @@ def test_backfill_youtube_urls_skips_restaurant_on_fetch_failure():
         assert session.get(Restaurant, "place-1").youtube_url is None
 
 
+def test_backfill_youtube_urls_respects_limit():
+    session_factory = make_test_session_factory()
+
+    with session_factory() as session:
+        session.add_all(
+            [
+                Restaurant(id="place-1", name="경양카츠 연남점"),
+                Restaurant(id="place-2", name="경양카츠 연남점"),
+                Restaurant(id="place-3", name="경양카츠 연남점"),
+            ]
+        )
+        session.commit()
+
+    calls = []
+
+    def fake_fetch(url, **kwargs):
+        calls.append(url)
+        return DETAIL_HTML_WITH_VIDEO
+
+    with patch("app.crawler.backfill_youtube.fetch_url", side_effect=fake_fetch), patch(
+        "app.crawler.backfill_youtube.time.sleep"
+    ):
+        backfill_youtube_urls(session_factory=session_factory, limit=2)
+
+    assert len(calls) == 2
+
+
 def test_fetch_with_deadline_raises_timeout_error_instead_of_hanging_forever():
     def hangs_forever(url, **kwargs):
         time.sleep(3600)
