@@ -251,3 +251,23 @@ def test_get_route_restaurants_returns_502_when_kakao_api_fails(monkeypatch):
     )
 
     assert response.status_code == 502
+
+
+def test_get_route_restaurants_returns_422_when_kakao_cannot_find_road_near_point(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+
+    def raise_error(*args, **kwargs):
+        from app.kakao.directions import KakaoDirectionsError
+
+        raise KakaoDirectionsError("Kakao Directions API error: 시작 지점 주변의 도로를 탐색할 수 없음")
+
+    monkeypatch.setattr("app.api.routes.fetch_route", raise_error)
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/route-restaurants",
+        params={"origin": "37.5,127.0", "destination": "37.6,127.1"},
+    )
+
+    assert response.status_code == 422
+    assert "다른 장소를 선택" in response.json()["detail"]

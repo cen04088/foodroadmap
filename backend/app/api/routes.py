@@ -73,6 +73,13 @@ def get_route_restaurants(
         route_points = parse_route_points(raw_response)
         route_summary = parse_route_summary(raw_response)
     except KakaoDirectionsError as exc:
+        if "탐색할 수 없음" in str(exc):
+            # 출발/도착 좌표 주변에 카카오 도로 데이터가 없는 경우 (섬, 사유지 등) — 재시도해도 동일하게 실패하므로
+            # 일시적 오류(502)와 구분해 다른 장소를 선택하라고 안내한다.
+            raise HTTPException(
+                status_code=422,
+                detail="선택한 위치 근처에서 자동차 경로를 찾을 수 없어요. 다른 장소를 선택해보세요",
+            ) from exc
         raise HTTPException(status_code=502, detail=f"경로를 가져오지 못했습니다: {exc}") from exc
 
     if len(route_points) < 2:
