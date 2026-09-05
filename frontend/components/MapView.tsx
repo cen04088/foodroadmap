@@ -82,6 +82,7 @@ export default function MapView({
 
   useEffect(() => {
     let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
     loadKakaoMapsSdk()
       .then((kakao) => {
         if (cancelled || !containerRef.current) return;
@@ -91,6 +92,15 @@ export default function MapView({
           center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
           level: 6,
         });
+
+        // 반응형 레이아웃에서 지도 컨테이너의 최종 크기가 지도 생성 이후에
+        // 확정되면(예: 모바일에서 위쪽 카드 높이가 나중에 정해짐) 카카오맵이
+        // 잘못된 크기로 굳어 검은 화면만 보일 수 있다 — 크기가 바뀔 때마다
+        // relayout을 호출해 항상 컨테이너에 맞춰 다시 그리게 한다.
+        resizeObserver = new ResizeObserver(() => {
+          mapRef.current?.relayout();
+        });
+        resizeObserver.observe(containerRef.current);
       })
       .catch(() => {
         if (cancelled) return;
@@ -98,6 +108,7 @@ export default function MapView({
       });
     return () => {
       cancelled = true;
+      resizeObserver?.disconnect();
     };
     // 최초 마운트 시 한 번만 지도를 생성한다 — 이후 center 변경은 아래 별도 effect가 panTo로 처리한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
