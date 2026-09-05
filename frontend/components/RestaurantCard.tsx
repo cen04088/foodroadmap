@@ -6,21 +6,19 @@ import { getBroadcastColor } from "../lib/broadcastColors";
 
 export interface RestaurantCardProps {
   restaurant: RestaurantResult;
-  isHovered: boolean;
-  onHover: (id: string | null) => void;
+  isSelected: boolean;
   onSelect: (id: string) => void;
   onShowDetail: (id: string) => void;
 }
 
-export default function RestaurantCard({ restaurant, isHovered, onHover, onSelect, onShowDetail }: RestaurantCardProps) {
+export default function RestaurantCard({ restaurant, isSelected, onSelect, onShowDetail }: RestaurantCardProps) {
   const metaLine = [restaurant.address, restaurant.phone, restaurant.hours].filter(Boolean).join(" · ");
 
   return (
     <div
-      onMouseEnter={() => onHover(restaurant.id)}
       onClick={() => onSelect(restaurant.id)}
       className={`cursor-pointer rounded-xl border p-4 transition ${
-        isHovered
+        isSelected
           ? "border-accent bg-accent-soft shadow-md shadow-accent/10"
           : "border-line bg-surface hover:border-accent/40 hover:shadow-md hover:shadow-black/5"
       }`}

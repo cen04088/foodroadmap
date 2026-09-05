@@ -6,8 +6,7 @@ import type { RestaurantResult } from "../lib/api";
 
 export interface RestaurantListProps {
   restaurants: RestaurantResult[];
-  hoveredId: string | null;
-  onHover: (id: string | null) => void;
+  selectedId: string | null;
   onSelect: (id: string) => void;
   onShowDetail: (id: string) => void;
   scrollToId?: string | null;
@@ -15,8 +14,7 @@ export interface RestaurantListProps {
 
 export default function RestaurantList({
   restaurants,
-  hoveredId,
-  onHover,
+  selectedId,
   onSelect,
   onShowDetail,
   scrollToId,
@@ -48,8 +46,7 @@ export default function RestaurantList({
         >
           <RestaurantCard
             restaurant={restaurant}
-            isHovered={hoveredId === restaurant.id}
-            onHover={onHover}
+            isSelected={selectedId === restaurant.id}
             onSelect={onSelect}
             onShowDetail={onShowDetail}
           />

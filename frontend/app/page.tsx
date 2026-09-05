@@ -32,7 +32,7 @@ function HomeContent() {
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -98,17 +98,17 @@ function HomeContent() {
   }
 
   function handleSelectRestaurant(id: string) {
-    setHoveredId(id);
+    setSelectedId(id);
   }
 
   function handleShowDetail(id: string) {
     setDetailId(id);
-    setHoveredId(id);
+    setSelectedId(id);
   }
 
   function handleMarkerClick(id: string) {
     setDetailId(null);
-    setHoveredId(id);
+    setSelectedId(id);
     setListScrollTarget(id);
   }
 
@@ -121,7 +121,7 @@ function HomeContent() {
         <MapView
           route={result?.route.points ?? []}
           restaurants={result?.restaurants ?? []}
-          highlightedRestaurantId={hoveredId}
+          highlightedRestaurantId={selectedId}
           center={mapCenter}
           activeBroadcast={filters.broadcast || null}
           onMarkerClick={handleMarkerClick}
@@ -160,8 +160,7 @@ function HomeContent() {
             ) : result ? (
               <RestaurantList
                 restaurants={result.restaurants}
-                hoveredId={hoveredId}
-                onHover={setHoveredId}
+                selectedId={selectedId}
                 onSelect={handleSelectRestaurant}
                 onShowDetail={handleShowDetail}
                 scrollToId={listScrollTarget}
