@@ -109,7 +109,7 @@ function HomeContent() {
   const detailRestaurant = detailId ? result?.restaurants.find((r) => r.id === detailId) ?? null : null;
 
   return (
-    <main className="relative flex h-screen w-full flex-col">
+    <main className="relative flex w-full flex-col sm:h-screen">
       {/* 지도 — 데스크톱에서는 화면 전체를 채우는 배경, 모바일에서는 지금처럼 목록 위에 고정 높이로 위치 */}
       <div ref={mapContainerRef} className="order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
         <MapView
@@ -146,8 +146,8 @@ function HomeContent() {
           </div>
         )}
 
-        <div className="order-4 min-h-0 flex-1 overflow-y-auto p-4 pt-0 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
-          <div className="h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-line sm:bg-surface sm:p-3 sm:shadow-lg sm:shadow-black/10">
+        <div className="order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
+          <div className="sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-line sm:bg-surface sm:p-3 sm:shadow-lg sm:shadow-black/10">
             {detailRestaurant ? (
               <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
             ) : result ? (
