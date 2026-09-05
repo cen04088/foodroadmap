@@ -8,9 +8,10 @@ export interface RestaurantListProps {
   hoveredId: string | null;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
+  onShowDetail: (id: string) => void;
 }
 
-export default function RestaurantList({ restaurants, hoveredId, onHover, onSelect }: RestaurantListProps) {
+export default function RestaurantList({ restaurants, hoveredId, onHover, onSelect, onShowDetail }: RestaurantListProps) {
   if (restaurants.length === 0) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted">
@@ -28,6 +29,7 @@ export default function RestaurantList({ restaurants, hoveredId, onHover, onSele
           isHovered={hoveredId === restaurant.id}
           onHover={onHover}
           onSelect={onSelect}
+          onShowDetail={onShowDetail}
         />
       ))}
     </div>

@@ -7,6 +7,7 @@ import SearchForm, { type SelectedPlace } from "../components/SearchForm";
 import FilterBar, { type Filters } from "../components/FilterBar";
 import MapView from "../components/MapView";
 import RestaurantList from "../components/RestaurantList";
+import RestaurantDetail from "../components/RestaurantDetail";
 import { ApiError, fetchRouteRestaurants, type RouteRestaurantsResponse } from "../lib/api";
 
 function errorMessageFor(error: unknown): string {
@@ -31,6 +32,7 @@ function HomeContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const searchSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,6 +46,7 @@ function HomeContent() {
     const seq = ++searchSeqRef.current;
     setIsLoading(true);
     setErrorMessage(null);
+    setDetailId(null);
     try {
       const response = await fetchRouteRestaurants({
         originLat: searchOrigin.lat,
@@ -97,6 +100,14 @@ function HomeContent() {
     mapContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function handleShowDetail(id: string) {
+    setDetailId(id);
+    setHoveredId(id);
+    mapContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const detailRestaurant = detailId ? result?.restaurants.find((r) => r.id === detailId) ?? null : null;
+
   return (
     <main className="relative flex h-screen w-full flex-col">
       {/* 지도 — 데스크톱에서는 화면 전체를 채우는 배경, 모바일에서는 지금처럼 목록 위에 고정 높이로 위치 */}
@@ -137,12 +148,15 @@ function HomeContent() {
 
         <div className="order-4 min-h-0 flex-1 overflow-y-auto p-4 pt-0 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
           <div className="h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-line sm:bg-surface sm:p-3 sm:shadow-lg sm:shadow-black/10">
-            {result ? (
+            {detailRestaurant ? (
+              <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
+            ) : result ? (
               <RestaurantList
                 restaurants={result.restaurants}
                 hoveredId={hoveredId}
                 onHover={setHoveredId}
                 onSelect={handleSelectRestaurant}
+                onShowDetail={handleShowDetail}
               />
             ) : (
               <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted sm:border-none">

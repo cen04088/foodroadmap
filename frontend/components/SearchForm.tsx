@@ -80,14 +80,14 @@ function PlaceInput({
   const showDropdown = !sdkError && (suggestions.length > 0 || (query && hasSearched && !selected));
 
   return (
-    <div className="relative flex-1">
+    <div className="relative w-full">
       <input
         type="text"
         value={query}
         onChange={(e) => handleQueryChange(e.target.value)}
         placeholder={label}
         disabled={sdkError}
-        className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[15px] text-ink placeholder:text-ink-muted outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft disabled:bg-surface-hover disabled:text-ink-muted"
+        className="w-full rounded-xl border border-line bg-surface px-4 py-3.5 text-base text-ink placeholder:text-ink-muted outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft disabled:bg-surface-hover disabled:text-ink-muted"
       />
       {sdkError && <p className="mt-1.5 text-xs text-ink-muted">장소 검색을 사용할 수 없어요</p>}
       {showDropdown && (
@@ -152,19 +152,22 @@ export default function SearchForm({ onOriginSelect, onSearch, isLoading }: Sear
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-      <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         <PlaceInput label="출발지" onSelect={handleOriginSelect} />
-        <span className="hidden shrink-0 text-ink-muted sm:block" aria-hidden="true">
-          →
-        </span>
+        <div className="flex items-center gap-3 pl-1" aria-hidden="true">
+          <span className="h-4 w-px bg-line" />
+          <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 text-ink-muted">
+            <path d="M10 3v14M10 17l-4-4M10 17l4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
         <PlaceInput label="도착지" onSelect={setDestination} />
       </div>
       <button
         type="button"
         disabled={!origin || !destination || isLoading}
         onClick={handleSubmit}
-        className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-[15px] font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-muted"
+        className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-muted"
       >
         {isLoading ? <Spinner /> : <SearchIcon />}
         {isLoading ? "검색 중" : "검색"}

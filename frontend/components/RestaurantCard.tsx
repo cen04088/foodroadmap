@@ -9,9 +9,10 @@ export interface RestaurantCardProps {
   isHovered: boolean;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
+  onShowDetail: (id: string) => void;
 }
 
-export default function RestaurantCard({ restaurant, isHovered, onHover, onSelect }: RestaurantCardProps) {
+export default function RestaurantCard({ restaurant, isHovered, onHover, onSelect, onShowDetail }: RestaurantCardProps) {
   const metaLine = [restaurant.address, restaurant.phone, restaurant.hours].filter(Boolean).join(" · ");
 
   return (
@@ -55,6 +56,17 @@ export default function RestaurantCard({ restaurant, isHovered, onHover, onSelec
       )}
 
       {metaLine && <div className="mt-2 text-xs text-ink-muted">{metaLine}</div>}
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onShowDetail(restaurant.id);
+        }}
+        className="mt-2.5 text-xs font-medium text-accent transition hover:text-accent-hover"
+      >
+        자세히 보기
+      </button>
     </div>
   );
 }
