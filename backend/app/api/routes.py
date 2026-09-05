@@ -6,7 +6,8 @@ from app.db import make_engine, make_session_factory
 from app.geo import bounding_box_with_margin
 from app.kakao.directions import KakaoDirectionsError, fetch_route, parse_route_points, parse_route_summary
 from app.matching import RestaurantMatch, match_restaurants_to_route
-from app.repository import list_broadcasts_with_counts, query_candidate_restaurants
+from app.models import Restaurant
+from app.repository import list_all_restaurants, list_broadcasts_with_counts, query_candidate_restaurants
 
 router = APIRouter()
 
@@ -47,9 +48,34 @@ def _serialize_match(match: RestaurantMatch) -> dict:
     }
 
 
+def _serialize_restaurant(restaurant: Restaurant) -> dict:
+    return {
+        "id": restaurant.id,
+        "name": restaurant.name,
+        "category": restaurant.category,
+        "address": restaurant.address,
+        "latitude": restaurant.latitude,
+        "longitude": restaurant.longitude,
+        "phone": restaurant.phone,
+        "hours": restaurant.hours,
+        "youtube_url": restaurant.youtube_url,
+        "broadcasts": [b.name for b in restaurant.broadcasts],
+    }
+
+
 @router.get("/api/broadcasts")
 def get_broadcasts(session: Session = Depends(get_session)):
     return {"broadcasts": list_broadcasts_with_counts(session)}
+
+
+@router.get("/api/restaurants")
+def get_restaurants(
+    broadcast: str | None = Query(None),
+    category: str | None = Query(None),
+    session: Session = Depends(get_session),
+):
+    restaurants = list_all_restaurants(session, broadcast_slug=broadcast, category=category)
+    return {"restaurants": [_serialize_restaurant(r) for r in restaurants]}
 
 
 @router.get("/api/route-restaurants")

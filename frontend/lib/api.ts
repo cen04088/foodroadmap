@@ -5,7 +5,7 @@ export interface RoutePoint {
   cumulative_time_sec: number;
 }
 
-export interface RestaurantResult {
+export interface RestaurantSummary {
   id: string;
   name: string;
   category: string | null;
@@ -15,9 +15,12 @@ export interface RestaurantResult {
   phone: string | null;
   hours: string | null;
   youtube_url: string | null;
+  broadcasts: string[];
+}
+
+export interface RestaurantResult extends RestaurantSummary {
   distance_from_route_km: number;
   cumulative_time_sec: number;
-  broadcasts: string[];
 }
 
 export interface RouteRestaurantsResponse {
@@ -90,4 +93,25 @@ export async function fetchBroadcasts(
 ): Promise<BroadcastSummary[]> {
   const data = await fetchJson<{ broadcasts: BroadcastSummary[] }>("/api/broadcasts", baseUrl);
   return data.broadcasts;
+}
+
+export interface FetchAllRestaurantsParams {
+  broadcast?: string;
+  category?: string;
+}
+
+export async function fetchAllRestaurants(
+  params: FetchAllRestaurantsParams = {},
+  baseUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
+): Promise<RestaurantSummary[]> {
+  const query = new URLSearchParams();
+  if (params.broadcast) query.set("broadcast", params.broadcast);
+  if (params.category) query.set("category", params.category);
+
+  const qs = query.toString();
+  const data = await fetchJson<{ restaurants: RestaurantSummary[] }>(
+    `/api/restaurants${qs ? `?${qs}` : ""}`,
+    baseUrl
+  );
+  return data.restaurants;
 }

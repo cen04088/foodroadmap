@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
-import type { RestaurantResult, RoutePoint } from "../lib/api";
+import type { RestaurantResult, RestaurantSummary, RoutePoint } from "../lib/api";
 import { formatDuration } from "../lib/format";
 import { getBroadcastColor } from "../lib/broadcastColors";
 
@@ -19,8 +19,12 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
+function hasRouteInfo(restaurant: RestaurantSummary): restaurant is RestaurantResult {
+  return "distance_from_route_km" in restaurant && "cumulative_time_sec" in restaurant;
+}
+
 // 활성 방송 필터에 해당하는 방송이 있으면 그 방송, 없으면 첫 번째 방송 기준으로 마커 색을 정한다.
-function pickBroadcastName(restaurant: RestaurantResult, activeBroadcast: string | null): string | null {
+function pickBroadcastName(restaurant: RestaurantSummary, activeBroadcast: string | null): string | null {
   if (activeBroadcast && restaurant.broadcasts.includes(activeBroadcast)) {
     return activeBroadcast;
   }
@@ -41,7 +45,7 @@ function markerImageDataUrl(color: string, letter: string, isHighlighted: boolea
 
 export interface MapViewProps {
   route: RoutePoint[];
-  restaurants: RestaurantResult[];
+  restaurants: RestaurantSummary[];
   highlightedRestaurantId: string | null;
   center: { lat: number; lng: number } | null;
   activeBroadcast?: string | null;
@@ -61,6 +65,8 @@ export default function MapView({
   const kakaoRef = useRef<any>(null);
   const polylineRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
+  const markerMetaRef = useRef<Map<string, { color: string; letter: string }>>(new Map());
+  const highlightedIdRef = useRef<string | null>(null);
   const infoWindowRef = useRef<any>(null);
   const centerRef = useRef(center);
   const onMarkerClickRef = useRef(onMarkerClick);
@@ -135,11 +141,13 @@ export default function MapView({
 
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current.clear();
+    markerMetaRef.current.clear();
 
     restaurants.forEach((restaurant, index) => {
       const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
       const { color, letter } = getBroadcastColor(broadcastName ?? "");
-      const isHighlighted = highlightedRestaurantId === restaurant.id;
+      markerMetaRef.current.set(restaurant.id, { color, letter });
+      const isHighlighted = highlightedIdRef.current === restaurant.id;
       const size = isHighlighted ? MARKER_SIZE_HIGHLIGHTED : MARKER_SIZE;
       const markerImage = new kakao.maps.MarkerImage(
         markerImageDataUrl(color, letter, isHighlighted),
@@ -155,11 +163,19 @@ export default function MapView({
         if (infoWindowRef.current) {
           infoWindowRef.current.close();
         }
+        const topLine = hasRouteInfo(restaurant)
+          ? `${index + 1}번째 STOP · ${escapeHtml(broadcastName ?? "방송 맛집")}`
+          : escapeHtml(broadcastName ?? "방송 맛집");
+        const bottomLine = hasRouteInfo(restaurant)
+          ? `출발 후 ${formatDuration(restaurant.cumulative_time_sec)} · 경로에서 ${restaurant.distance_from_route_km.toFixed(1)}km`
+          : restaurant.address
+            ? escapeHtml(restaurant.address)
+            : "";
         infoWindowRef.current = new kakao.maps.InfoWindow({
           content: `<div style="padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;min-width:120px;">
-            <div style="font-size:12px;font-weight:700;color:#ff7a1a;">${index + 1}번째 STOP · ${escapeHtml(broadcastName ?? "방송 맛집")}</div>
+            <div style="font-size:12px;font-weight:700;color:#ff7a1a;">${topLine}</div>
             <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;">${escapeHtml(restaurant.name)}</div>
-            <div style="margin-top:3px;font-size:12px;color:#78716c;">출발 후 ${formatDuration(restaurant.cumulative_time_sec)} · 경로에서 ${restaurant.distance_from_route_km.toFixed(1)}km</div>
+            ${bottomLine ? `<div style="margin-top:3px;font-size:12px;color:#78716c;">${bottomLine}</div>` : ""}
           </div>`,
         });
         infoWindowRef.current.open(map, marker);
@@ -167,13 +183,43 @@ export default function MapView({
       });
       markersRef.current.set(restaurant.id, marker);
     });
-  }, [restaurants, activeBroadcast, highlightedRestaurantId]);
+  }, [restaurants, activeBroadcast]);
 
+  // 마커 수천 개를 다시 만들지 않고, 이전/새 강조 마커 두 개의 이미지만 교체한다.
   useEffect(() => {
-    if (!highlightedRestaurantId) return;
-    const marker = markersRef.current.get(highlightedRestaurantId);
+    const kakao = kakaoRef.current;
     const map = mapRef.current;
-    if (!marker || !map) return;
+    if (!kakao || !map) return;
+
+    const previousId = highlightedIdRef.current;
+    if (previousId && previousId !== highlightedRestaurantId) {
+      const prevMarker = markersRef.current.get(previousId);
+      const meta = markerMetaRef.current.get(previousId);
+      if (prevMarker && meta) {
+        prevMarker.setImage(
+          new kakao.maps.MarkerImage(
+            markerImageDataUrl(meta.color, meta.letter, false),
+            new kakao.maps.Size(MARKER_SIZE, MARKER_SIZE),
+            { offset: new kakao.maps.Point(MARKER_SIZE / 2, MARKER_SIZE / 2) }
+          )
+        );
+      }
+    }
+
+    highlightedIdRef.current = highlightedRestaurantId;
+    if (!highlightedRestaurantId) return;
+
+    const marker = markersRef.current.get(highlightedRestaurantId);
+    const meta = markerMetaRef.current.get(highlightedRestaurantId);
+    if (!marker || !meta) return;
+
+    marker.setImage(
+      new kakao.maps.MarkerImage(
+        markerImageDataUrl(meta.color, meta.letter, true),
+        new kakao.maps.Size(MARKER_SIZE_HIGHLIGHTED, MARKER_SIZE_HIGHLIGHTED),
+        { offset: new kakao.maps.Point(MARKER_SIZE_HIGHLIGHTED / 2, MARKER_SIZE_HIGHLIGHTED / 2) }
+      )
+    );
     map.panTo(marker.getPosition());
   }, [highlightedRestaurantId]);
 

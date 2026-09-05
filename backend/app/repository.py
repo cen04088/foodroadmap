@@ -32,6 +32,28 @@ def query_candidate_restaurants(
     return list(session.scalars(stmt).unique())
 
 
+def list_all_restaurants(
+    session: Session,
+    *,
+    broadcast_slug: str | None = None,
+    category: str | None = None,
+) -> list[Restaurant]:
+    stmt = select(Restaurant).options(selectinload(Restaurant.broadcasts)).where(
+        Restaurant.latitude.is_not(None),
+        Restaurant.longitude.is_not(None),
+    )
+
+    if category:
+        stmt = stmt.where(Restaurant.category == category)
+
+    if broadcast_slug:
+        stmt = stmt.join(Restaurant.broadcasts).where(
+            or_(Broadcast.id == broadcast_slug, Broadcast.name == broadcast_slug)
+        )
+
+    return list(session.scalars(stmt).unique())
+
+
 def list_broadcasts_with_counts(session: Session) -> list[dict]:
     counts_subquery = (
         select(

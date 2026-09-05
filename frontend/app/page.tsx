@@ -1,14 +1,21 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import SearchForm, { type SelectedPlace } from "../components/SearchForm";
 import FilterBar, { type Filters } from "../components/FilterBar";
+import MapFilter from "../components/MapFilter";
 import MapView from "../components/MapView";
 import RestaurantList from "../components/RestaurantList";
 import RestaurantDetail from "../components/RestaurantDetail";
-import { ApiError, fetchRouteRestaurants, type RouteRestaurantsResponse } from "../lib/api";
+import {
+  ApiError,
+  fetchAllRestaurants,
+  fetchRouteRestaurants,
+  type RestaurantSummary,
+  type RouteRestaurantsResponse,
+} from "../lib/api";
 import { formatDuration } from "../lib/format";
 
 function errorMessageFor(error: unknown): string {
@@ -38,9 +45,25 @@ function HomeContent() {
   const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [radiusKm, setRadiusKm] = useState(2);
+  const [browseRestaurants, setBrowseRestaurants] = useState<RestaurantSummary[]>([]);
+  const [browseBroadcast, setBrowseBroadcast] = useState("");
   const searchSeqRef = useRef(0);
+  const browseSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const seq = ++browseSeqRef.current;
+    fetchAllRestaurants({ broadcast: browseBroadcast || undefined })
+      .then((restaurants) => {
+        if (seq !== browseSeqRef.current) return;
+        setBrowseRestaurants(restaurants);
+      })
+      .catch(() => {
+        if (seq !== browseSeqRef.current) return;
+        setBrowseRestaurants([]);
+      });
+  }, [browseBroadcast]);
 
   async function runSearch(
     searchOrigin: SelectedPlace,
@@ -121,16 +144,22 @@ function HomeContent() {
 
   return (
     <main className="relative flex min-h-screen w-full flex-col overflow-hidden sm:h-screen sm:min-h-0">
-      {/* 지도 — 데스크톱에서는 화면 전체를 채우는 배경, 모바일에서는 지금처럼 목록 위에 고정 높이로 위치 */}
-      <div ref={mapContainerRef} className="order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
+      {/* 지도 — 데스크톱에서는 화면 전체를 채우는 배경, 모바일에서는 지금처럼 목록 위에 고정 높이로 위치.
+          검색 전에는 전체 맛집을, 검색 후에는 경로상 맛집만 보여준다. */}
+      <div ref={mapContainerRef} className="relative order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
         <MapView
           route={result?.route.points ?? []}
-          restaurants={result?.restaurants ?? []}
+          restaurants={result ? result.restaurants : browseRestaurants}
           highlightedRestaurantId={selectedId}
           center={mapCenter}
-          activeBroadcast={filters.broadcast || null}
+          activeBroadcast={(result ? filters.broadcast : browseBroadcast) || null}
           onMarkerClick={handleMarkerClick}
         />
+        {!result && (
+          <div className="absolute right-6 top-4 z-10 sm:top-6">
+            <MapFilter value={browseBroadcast} onChange={setBrowseBroadcast} />
+          </div>
+        )}
       </div>
 
       {/* 검색+필터+목록 — 모바일에서는 지금처럼 세로로 쌓이고(display: contents로 위 지도 사이에 끼워짐),

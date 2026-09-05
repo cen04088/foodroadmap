@@ -3,7 +3,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import init_db, make_session_factory
 from app.models import Broadcast, Restaurant
-from app.repository import list_broadcasts_with_counts, query_candidate_restaurants
+from app.repository import list_all_restaurants, list_broadcasts_with_counts, query_candidate_restaurants
 
 
 def make_session_factory_in_memory():
@@ -85,6 +85,45 @@ def test_query_candidate_restaurants_filters_by_broadcast_display_name():
 
         assert {r.id for r in by_name} == {"inside"}
         assert {r.id for r in by_name} == {r.id for r in by_slug}
+
+
+def test_list_all_restaurants_returns_every_restaurant_with_coordinates_regardless_of_location():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed(session)
+
+        results = list_all_restaurants(session)
+
+        ids = {r.id for r in results}
+        assert "inside" in ids
+        assert "outside" in ids
+        assert "wrong-category" in ids
+        assert "no-coords" not in ids
+
+
+def test_list_all_restaurants_filters_by_category():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed(session)
+
+        results = list_all_restaurants(session, category="한식")
+
+        ids = {r.id for r in results}
+        assert "inside" in ids
+        assert "outside" in ids
+        assert "wrong-category" not in ids
+
+
+def test_list_all_restaurants_filters_by_broadcast_slug_or_name():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed(session)
+
+        by_slug = list_all_restaurants(session, broadcast_slug="ttoganjib")
+        by_name = list_all_restaurants(session, broadcast_slug="또간집")
+
+        assert {r.id for r in by_slug} == {"inside"}
+        assert {r.id for r in by_name} == {"inside"}
 
 
 def test_list_broadcasts_with_counts_counts_only_restaurants_with_coordinates():
