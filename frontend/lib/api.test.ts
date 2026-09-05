@@ -27,6 +27,7 @@ describe("fetchRouteRestaurants", () => {
         destinationLng: 127.0276,
         broadcast: "또간집",
         category: "한식",
+        radiusKm: 3,
       },
       "http://localhost:8000"
     );
@@ -39,6 +40,24 @@ describe("fetchRouteRestaurants", () => {
     expect(calledUrl.searchParams.get("destination")).toBe("37.4979,127.0276");
     expect(calledUrl.searchParams.get("broadcast")).toBe("또간집");
     expect(calledUrl.searchParams.get("category")).toBe("한식");
+    expect(calledUrl.searchParams.get("radius_km")).toBe("3");
+  });
+
+  it("omits radius_km from the query string when not provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => FAKE_RESPONSE,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchRouteRestaurants(
+      { originLat: 0, originLng: 0, destinationLat: 0, destinationLng: 0 },
+      "http://localhost:8000"
+    );
+
+    const calledUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.has("radius_km")).toBe(false);
   });
 
   it("throws ApiError with the response status on a non-ok response", async () => {

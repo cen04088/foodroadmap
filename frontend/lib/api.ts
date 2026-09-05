@@ -46,6 +46,7 @@ export interface FetchRouteRestaurantsParams {
   destinationLng: number;
   broadcast?: string;
   category?: string;
+  radiusKm?: number;
 }
 
 export interface BroadcastSummary {
@@ -79,6 +80,7 @@ export async function fetchRouteRestaurants(
   });
   if (params.broadcast) query.set("broadcast", params.broadcast);
   if (params.category) query.set("category", params.category);
+  if (params.radiusKm) query.set("radius_km", String(params.radiusKm));
 
   return fetchJson<RouteRestaurantsResponse>(`/api/route-restaurants?${query.toString()}`, baseUrl);
 }

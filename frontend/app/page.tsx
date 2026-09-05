@@ -37,6 +37,7 @@ function HomeContent() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [radiusKm, setRadiusKm] = useState(2);
   const searchSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +59,7 @@ function HomeContent() {
         destinationLng: searchDestination.lng,
         broadcast: searchFilters.broadcast || undefined,
         category: searchFilters.category || undefined,
+        radiusKm,
       });
       if (seq !== searchSeqRef.current) return;
       setResult(response);
@@ -152,8 +154,23 @@ function HomeContent() {
             <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
             {!isJourneyReady && (
               <div className="mt-5 border-t border-white/10 pt-4">
-                <p className="mb-2 text-xs font-medium text-[#a89c91]">추천 반경 <span className="ml-2 text-[#ffb45a]">2km</span></p>
-                <div className="flex gap-2 text-xs"><span className="rounded-full bg-[#ff7a1a]/15 px-3 py-1.5 text-[#ffb45a]">● 1km</span><span className="rounded-full bg-[#ff7a1a] px-3 py-1.5 font-semibold text-[#171310]">● 2km</span><span className="rounded-full bg-white/5 px-3 py-1.5 text-[#a89c91]">○ 3km</span></div>
+                <p className="mb-2 text-xs font-medium text-[#a89c91]">추천 반경 <span className="ml-2 text-[#ffb45a]">{radiusKm}km</span></p>
+                <div className="flex gap-2 text-xs">
+                  {[1, 2, 3].map((km) => (
+                    <button
+                      key={km}
+                      type="button"
+                      onClick={() => setRadiusKm(km)}
+                      className={`rounded-full px-3 py-1.5 transition ${
+                        radiusKm === km
+                          ? "bg-[#ff7a1a] font-semibold text-[#171310]"
+                          : "bg-white/5 text-[#a89c91] hover:bg-white/10"
+                      }`}
+                    >
+                      {radiusKm === km ? "●" : "○"} {km}km
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {isJourneyReady && <><div className="my-4 border-t border-white/10" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
