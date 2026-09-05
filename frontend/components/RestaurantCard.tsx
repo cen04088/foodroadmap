@@ -18,7 +18,6 @@ export default function RestaurantCard({ restaurant, isHovered, onHover, onSelec
   return (
     <div
       onMouseEnter={() => onHover(restaurant.id)}
-      onMouseLeave={() => onHover(null)}
       onClick={() => onSelect(restaurant.id)}
       className={`cursor-pointer rounded-xl border p-4 transition ${
         isHovered

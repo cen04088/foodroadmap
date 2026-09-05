@@ -99,13 +99,11 @@ function HomeContent() {
 
   function handleSelectRestaurant(id: string) {
     setHoveredId(id);
-    mapContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function handleShowDetail(id: string) {
     setDetailId(id);
     setHoveredId(id);
-    mapContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function handleMarkerClick(id: string) {
