@@ -27,9 +27,9 @@ function pickBroadcastName(restaurant: RestaurantResult, activeBroadcast: string
   return restaurant.broadcasts[0] ?? null;
 }
 
-function markerImageDataUrl(color: string, order: number, isHighlighted: boolean): string {
+function markerImageDataUrl(color: string, letter: string, isHighlighted: boolean): string {
   const ring = isHighlighted ? "#FFB45A" : color;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${MARKER_WIDTH}" height="${MARKER_HEIGHT}" viewBox="0 0 ${MARKER_WIDTH} ${MARKER_HEIGHT}"><path d="M23 51C23 51 6 34 6 21a17 17 0 1 1 34 0c0 13-17 30-17 30Z" fill="#FF7A1A" stroke="${ring}" stroke-width="3"/><circle cx="23" cy="21" r="11" fill="#171310"/><text x="23" y="26" font-family="Pretendard, sans-serif" font-size="14" font-weight="800" fill="#FFF7ED" text-anchor="middle">${order}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${MARKER_WIDTH}" height="${MARKER_HEIGHT}" viewBox="0 0 ${MARKER_WIDTH} ${MARKER_HEIGHT}"><path d="M23 51C23 51 6 34 6 21a17 17 0 1 1 34 0c0 13-17 30-17 30Z" fill="#FF7A1A" stroke="${ring}" stroke-width="3"/><circle cx="23" cy="21" r="11" fill="#171310"/><text x="23" y="26" font-family="Pretendard, sans-serif" font-size="14" font-weight="800" fill="#FFF7ED" text-anchor="middle">${letter}</text></svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
@@ -132,9 +132,9 @@ export default function MapView({
 
     restaurants.forEach((restaurant, index) => {
       const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
-      const { color } = getBroadcastColor(broadcastName ?? "");
+      const { color, letter } = getBroadcastColor(broadcastName ?? "");
       const markerImage = new kakao.maps.MarkerImage(
-        markerImageDataUrl(color, index + 1, highlightedRestaurantId === restaurant.id),
+        markerImageDataUrl(color, letter, highlightedRestaurantId === restaurant.id),
         new kakao.maps.Size(MARKER_WIDTH, MARKER_HEIGHT),
         { offset: new kakao.maps.Point(MARKER_WIDTH / 2, MARKER_HEIGHT) }
       );
