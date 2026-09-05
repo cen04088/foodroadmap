@@ -156,7 +156,7 @@ function HomeContent() {
           onMarkerClick={handleMarkerClick}
         />
         {!result && (
-          <div className="absolute right-6 top-4 z-10 sm:top-6">
+          <div className="absolute right-6 top-4 z-10 sm:top-24">
             <MapFilter value={browseBroadcast} onChange={setBrowseBroadcast} />
           </div>
         )}
