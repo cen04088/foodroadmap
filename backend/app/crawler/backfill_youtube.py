@@ -99,6 +99,9 @@ def backfill_youtube_urls(
                     detail = parse_place_detail_page(detail_html)
                 except Exception:
                     logger.warning("failed to fetch/parse detail page for %s", external_id, exc_info=True)
+                    if progress_fh:
+                        progress_fh.write(f"{external_id}\n")
+                        progress_fh.flush()
                     continue
 
                 youtube_url = detail.get("youtube_url") if detail else None

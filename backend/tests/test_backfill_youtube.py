@@ -78,6 +78,29 @@ def test_backfill_youtube_urls_skips_restaurant_on_fetch_failure():
         assert session.get(Restaurant, "place-1").youtube_url is None
 
 
+def test_backfill_youtube_urls_records_fetch_failures_to_progress_file_too(tmp_path):
+    # A 404 (restaurant removed from matzipmap) will never succeed on
+    # retry -- it must be recorded just like a confirmed-empty result so
+    # batched runs don't waste a request on it forever.
+    session_factory = make_test_session_factory()
+    progress_file = str(tmp_path / "checked.txt")
+
+    with session_factory() as session:
+        session.add(Restaurant(id="place-1", name="사라진가게"))
+        session.commit()
+
+    def raise_error(*args, **kwargs):
+        raise RuntimeError("404")
+
+    with patch("app.crawler.backfill_youtube.fetch_url", side_effect=raise_error), patch(
+        "app.crawler.backfill_youtube.time.sleep"
+    ):
+        backfill_youtube_urls(session_factory=session_factory, progress_file=progress_file)
+
+    checked_ids = {line.strip() for line in open(progress_file, encoding="utf-8")}
+    assert checked_ids == {"place-1"}
+
+
 def test_backfill_youtube_urls_respects_limit():
     session_factory = make_test_session_factory()
 
