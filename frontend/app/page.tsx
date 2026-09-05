@@ -34,6 +34,7 @@ function HomeContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const searchSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,6 +108,12 @@ function HomeContent() {
     mapContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function handleMarkerClick(id: string) {
+    setDetailId(null);
+    setHoveredId(id);
+    setListScrollTarget(id);
+  }
+
   const detailRestaurant = detailId ? result?.restaurants.find((r) => r.id === detailId) ?? null : null;
 
   return (
@@ -119,6 +126,7 @@ function HomeContent() {
           highlightedRestaurantId={hoveredId}
           center={mapCenter}
           activeBroadcast={filters.broadcast || null}
+          onMarkerClick={handleMarkerClick}
         />
       </div>
 
@@ -158,6 +166,7 @@ function HomeContent() {
                 onHover={setHoveredId}
                 onSelect={handleSelectRestaurant}
                 onShowDetail={handleShowDetail}
+                scrollToId={listScrollTarget}
               />
             ) : (
               <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted sm:border-none">

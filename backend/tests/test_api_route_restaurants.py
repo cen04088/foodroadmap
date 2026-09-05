@@ -47,7 +47,12 @@ def seed(session_factory):
         session.add(ttoganjib)
 
         near = Restaurant(
-            id="near", name="Near Restaurant", latitude=37.55, longitude=127.05, category="한식"
+            id="near",
+            name="Near Restaurant",
+            latitude=37.55,
+            longitude=127.05,
+            category="한식",
+            youtube_url="https://www.youtube.com/watch?v=abc123",
         )
         near.broadcasts.append(ttoganjib)
 
@@ -108,6 +113,7 @@ def test_get_route_restaurants_returns_nearby_restaurant_with_expected_shape(mon
     assert near_result["broadcasts"] == ["또간집"]
     assert "distance_from_route_km" in near_result
     assert "cumulative_time_sec" in near_result
+    assert near_result["youtube_url"] == "https://www.youtube.com/watch?v=abc123"
 
 
 def test_get_route_restaurants_filters_by_broadcast_query_param(monkeypatch):

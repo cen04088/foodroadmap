@@ -17,6 +17,26 @@ def test_parse_place_detail_page_extracts_geo_and_fields():
     assert result["longitude"] == 126.9244277
     assert result["phone"] == "070-7543-5445"
     assert result["category"] == "일식"
+    assert result["youtube_url"] == "https://www.youtube.com/watch?v=13fi46HgCKw"
+
+
+def test_parse_place_detail_page_youtube_url_is_none_when_no_video_gallery_cell():
+    html = """
+    <html>
+    <body>
+    <script type="application/ld+json">
+    {"@type": "Restaurant", "name": "경양카츠 연남점", "address": "서울 마포구 연남동 260-29",
+     "geo": {"latitude": 37.5612032, "longitude": 126.9244277},
+     "telephone": "070-7543-5445", "servesCuisine": "일식"}
+    </script>
+    </body>
+    </html>
+    """
+
+    result = parse_place_detail_page(html)
+
+    assert result is not None
+    assert result["youtube_url"] is None
 
 
 def test_parse_place_detail_page_returns_none_without_restaurant_jsonld():

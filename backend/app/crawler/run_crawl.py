@@ -46,6 +46,8 @@ def upsert_restaurant(session, data: dict) -> Restaurant:
     if data.get("latitude") is not None:
         restaurant.latitude = data["latitude"]
         restaurant.longitude = data["longitude"]
+    if data.get("youtube_url") is not None:
+        restaurant.youtube_url = data["youtube_url"]
 
     return restaurant
 
@@ -175,6 +177,7 @@ def run_crawl(session_factory=None) -> None:
                         if detail:
                             merged["latitude"] = detail.get("latitude")
                             merged["longitude"] = detail.get("longitude")
+                            merged["youtube_url"] = detail.get("youtube_url")
 
                         upsert_restaurant(session, merged)
 

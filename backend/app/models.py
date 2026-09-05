@@ -22,6 +22,7 @@ class Restaurant(Base):
     hours = Column(String, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    youtube_url = Column(String, nullable=True)
 
     broadcasts = relationship(
         "Broadcast", secondary=restaurant_broadcasts, back_populates="restaurants"

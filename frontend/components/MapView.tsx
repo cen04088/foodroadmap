@@ -38,6 +38,7 @@ export interface MapViewProps {
   highlightedRestaurantId: string | null;
   center: { lat: number; lng: number } | null;
   activeBroadcast?: string | null;
+  onMarkerClick?: (id: string) => void;
 }
 
 export default function MapView({
@@ -46,6 +47,7 @@ export default function MapView({
   highlightedRestaurantId,
   center,
   activeBroadcast = null,
+  onMarkerClick,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -54,11 +56,16 @@ export default function MapView({
   const markersRef = useRef<Map<string, any>>(new Map());
   const infoWindowRef = useRef<any>(null);
   const centerRef = useRef(center);
+  const onMarkerClickRef = useRef(onMarkerClick);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     centerRef.current = center;
   }, [center]);
+
+  useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
+  }, [onMarkerClick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +153,7 @@ export default function MapView({
           </div>`,
         });
         infoWindowRef.current.open(map, marker);
+        onMarkerClickRef.current?.(restaurant.id);
       });
       markersRef.current.set(restaurant.id, marker);
     });

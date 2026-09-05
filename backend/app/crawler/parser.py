@@ -106,6 +106,7 @@ def parse_place_detail_page(html: str) -> dict | None:
             continue
 
         geo = entity.get("geo") or {}
+        youtube_link = soup.select_one('a.pgal__cell[href*="youtube.com/watch"]')
         return {
             "name": entity.get("name"),
             "address": entity.get("address"),
@@ -113,6 +114,7 @@ def parse_place_detail_page(html: str) -> dict | None:
             "longitude": geo.get("longitude"),
             "phone": entity.get("telephone"),
             "category": entity.get("servesCuisine"),
+            "youtube_url": youtube_link["href"] if youtube_link else None,
         }
 
     return None

@@ -40,6 +40,7 @@ def _serialize_match(match: RestaurantMatch) -> dict:
         "longitude": restaurant.longitude,
         "phone": restaurant.phone,
         "hours": restaurant.hours,
+        "youtube_url": restaurant.youtube_url,
         "distance_from_route_km": round(match.distance_from_route_km, 3),
         "cumulative_time_sec": round(match.cumulative_time_sec),
         "broadcasts": [b.name for b in restaurant.broadcasts],

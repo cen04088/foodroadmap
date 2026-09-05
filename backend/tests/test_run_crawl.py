@@ -46,6 +46,7 @@ DETAIL_HTML = """
  "geo": {"latitude": 37.5612032, "longitude": 126.9244277},
  "telephone": "070-7543-5445", "servesCuisine": "일식"}
 </script>
+<a class="pgal__cell" href="https://www.youtube.com/watch?v=13fi46HgCKw" aria-label="유튜브 앱에서 영상 보기"></a>
 """
 
 
@@ -96,6 +97,7 @@ def test_run_crawl_populates_restaurants_and_broadcasts():
         assert restaurant.name == "경양카츠 연남점"
         assert restaurant.latitude == 37.5612032
         assert restaurant.longitude == 126.9244277
+        assert restaurant.youtube_url == "https://www.youtube.com/watch?v=13fi46HgCKw"
         assert [b.id for b in restaurant.broadcasts] == ["ttoganjib"]
 
         broadcast = session.get(Broadcast, "ttoganjib")

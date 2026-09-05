@@ -14,6 +14,7 @@ export interface RestaurantResult {
   longitude: number;
   phone: string | null;
   hours: string | null;
+  youtube_url: string | null;
   distance_from_route_km: number;
   cumulative_time_sec: number;
   broadcasts: string[];

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { formatDistance, formatDuration } from "../lib/format";
 import type { RestaurantResult } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
+import { getYoutubeVideoId } from "../lib/youtube";
+import YoutubeModal from "./YoutubeModal";
 
 export interface RestaurantDetailProps {
   restaurant: RestaurantResult;
@@ -54,6 +56,15 @@ function ClockIcon() {
   );
 }
 
+function YoutubeIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <rect x="2.5" y="5" width="15" height="10" rx="3" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8.5 8v4l3.5-2-3.5-2Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 function CopyIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
@@ -65,6 +76,8 @@ function CopyIcon() {
 
 export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetailProps) {
   const [copied, setCopied] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const videoId = restaurant.youtube_url ? getYoutubeVideoId(restaurant.youtube_url) : null;
 
   async function handleCopyAddress() {
     if (!restaurant.address) return;
@@ -147,6 +160,17 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
             </a>
           )}
 
+          {videoId && (
+            <button
+              type="button"
+              onClick={() => setShowVideo(true)}
+              className="flex w-fit items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:border-accent/40 hover:text-accent"
+            >
+              <YoutubeIcon />
+              유튜브 보기
+            </button>
+          )}
+
           {restaurant.hours && (
             <div className="flex items-center gap-2.5 text-sm text-ink">
               <ClockIcon />
@@ -164,6 +188,10 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
       >
         카카오맵에서 길찾기
       </a>
+
+      {showVideo && videoId && (
+        <YoutubeModal videoId={videoId} title={restaurant.name} onClose={() => setShowVideo(false)} />
+      )}
     </div>
   );
 }
