@@ -167,7 +167,7 @@ export default function SearchForm({ onOriginSelect, onSearch, isLoading }: Sear
         type="button"
         disabled={!origin || !destination || isLoading}
         onClick={handleSubmit}
-        className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-muted"
+        className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-white shadow-[0_8px_28px_-6px_var(--accent-glow)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-muted disabled:shadow-none"
       >
         {isLoading ? <Spinner /> : <SearchIcon />}
         {isLoading ? "검색 중" : "검색"}

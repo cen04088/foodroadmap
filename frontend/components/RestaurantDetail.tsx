@@ -184,7 +184,7 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
         href={kakaoMapUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-3 flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-[15px] font-semibold text-white transition hover:bg-accent-hover"
+        className="mt-3 flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-6 py-3 text-[15px] font-semibold text-white shadow-[0_8px_28px_-6px_var(--accent-glow)] transition hover:bg-accent-hover"
       >
         카카오맵에서 길찾기
       </a>
