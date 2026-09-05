@@ -98,49 +98,58 @@ function HomeContent() {
   }
 
   return (
-    <main className="mx-auto flex h-screen w-full max-w-[1400px] flex-col gap-4 p-4 sm:gap-5 sm:p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-ink">경로 맛집</h1>
-        <Link href="/broadcasts" className="text-sm text-ink-muted transition hover:text-ink">
-          방송·유튜브별로 보기
-        </Link>
+    <main className="relative flex h-screen w-full flex-col">
+      {/* 지도 — 데스크톱에서는 화면 전체를 채우는 배경, 모바일에서는 지금처럼 목록 위에 고정 높이로 위치 */}
+      <div ref={mapContainerRef} className="order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
+        <MapView
+          route={result?.route.points ?? []}
+          restaurants={result?.restaurants ?? []}
+          highlightedRestaurantId={hoveredId}
+          center={mapCenter}
+          activeBroadcast={filters.broadcast || null}
+        />
       </div>
 
-      <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-black/5 sm:p-5">
-        <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
-        <div className="my-4 border-t border-line" />
-        <FilterBar filters={filters} onChange={handleFiltersChange} />
-      </div>
-
-      {errorMessage && (
-        <div className="rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
-          {errorMessage}
-        </div>
-      )}
-
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden sm:flex-row sm:gap-5">
-        <div ref={mapContainerRef} className="min-h-0 sm:w-3/5">
-          <MapView
-            route={result?.route.points ?? []}
-            restaurants={result?.restaurants ?? []}
-            highlightedRestaurantId={hoveredId}
-            center={mapCenter}
-            activeBroadcast={filters.broadcast || null}
-          />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto sm:w-2/5">
-          {result ? (
-            <RestaurantList
-              restaurants={result.restaurants}
-              hoveredId={hoveredId}
-              onHover={setHoveredId}
-              onSelect={handleSelectRestaurant}
-            />
-          ) : (
-            <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted">
-              출발지와 도착지를 검색해주세요
+      {/* 검색+필터+목록 — 모바일에서는 지금처럼 세로로 쌓이고(display: contents로 위 지도 사이에 끼워짐),
+          데스크톱에서는 지도 위에 뜨는 좌측 사이드바 하나로 묶인다. */}
+      <div className="contents sm:pointer-events-none sm:absolute sm:inset-y-6 sm:left-6 sm:z-10 sm:flex sm:w-[400px] sm:flex-col sm:gap-4">
+        <div className="order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
+          <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-black/5 sm:shadow-lg sm:shadow-black/10">
+            <div className="mb-4 flex items-center justify-between">
+              <h1 className="text-lg font-semibold text-ink">경로 맛집</h1>
+              <Link href="/broadcasts" className="text-sm text-ink-muted transition hover:text-ink">
+                방송·유튜브별로 보기
+              </Link>
             </div>
-          )}
+            <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
+            <div className="my-4 border-t border-line" />
+            <FilterBar filters={filters} onChange={handleFiltersChange} />
+          </div>
+        </div>
+
+        {errorMessage && (
+          <div className="order-2 shrink-0 px-4 sm:pointer-events-auto sm:px-0">
+            <div className="rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
+              {errorMessage}
+            </div>
+          </div>
+        )}
+
+        <div className="order-4 min-h-0 flex-1 overflow-y-auto p-4 pt-0 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
+          <div className="h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-line sm:bg-surface sm:p-3 sm:shadow-lg sm:shadow-black/10">
+            {result ? (
+              <RestaurantList
+                restaurants={result.restaurants}
+                hoveredId={hoveredId}
+                onHover={setHoveredId}
+                onSelect={handleSelectRestaurant}
+              />
+            ) : (
+              <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted sm:border-none">
+                출발지와 도착지를 검색해주세요
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>

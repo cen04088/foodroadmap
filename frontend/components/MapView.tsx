@@ -161,14 +161,14 @@ export default function MapView({
 
   if (loadError) {
     return (
-      <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded-2xl border border-line bg-surface text-sm text-ink-muted">
+      <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded-2xl border border-line bg-surface text-sm text-ink-muted sm:rounded-none sm:border-0">
         지도를 불러오지 못했습니다
       </div>
     );
   }
 
   return (
-    <div className="h-full min-h-[400px] w-full overflow-hidden rounded-2xl border border-line shadow-sm shadow-black/5">
+    <div className="h-full min-h-[400px] w-full overflow-hidden rounded-2xl border border-line shadow-sm shadow-black/5 sm:rounded-none sm:border-0 sm:shadow-none">
       <div ref={containerRef} className="h-full w-full" />
     </div>
   );
