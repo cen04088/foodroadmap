@@ -243,8 +243,10 @@ export default function MapView({
   }
 
   return (
-    <div className="h-full min-h-[400px] w-full overflow-hidden rounded-2xl border border-line shadow-sm shadow-black/5 sm:rounded-none sm:border-0 sm:shadow-none">
-      <div ref={containerRef} className="h-full w-full" />
+    <div className="relative h-full min-h-[400px] w-full overflow-hidden rounded-2xl border border-line shadow-sm shadow-black/5 sm:rounded-none sm:border-0 sm:shadow-none">
+      {/* h-full(%)은 min-height로만 크기가 잡힌 부모에서는 0으로 무너질 수 있어
+          absolute inset-0으로 부모의 실제 렌더링 박스를 그대로 채운다. */}
+      <div ref={containerRef} className="absolute inset-0" />
     </div>
   );
 }
