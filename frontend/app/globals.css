@@ -3,12 +3,12 @@
 
 :root {
   /* 심야 푸드로드트립: 아스팔트 블랙 위 헤드라이트/포장마차 조명 같은 오렌지 */
-  --paper: #120e0b;
-  --surface: #1c1512;
-  --surface-hover: #241c17;
+  --paper: #100c0a;
+  --surface: #3a2a1e;
+  --surface-hover: #4a3626;
   --ink: #f5ede4;
-  --ink-muted: #a69884;
-  --line: #332821;
+  --ink-muted: #b8a891;
+  --line: #5c4736;
   --accent: #f97316;
   --accent-hover: #fb923c;
   --accent-soft: rgba(249, 115, 22, 0.16);

@@ -38,7 +38,7 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
           className="w-full appearance-none rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
         >
           {BROADCASTS.map((b) => (
-            <option key={b.value} value={b.value}>
+            <option key={b.value} value={b.value} style={{ backgroundColor: "var(--surface)", color: "var(--ink)" }}>
               {b.label}
             </option>
           ))}
