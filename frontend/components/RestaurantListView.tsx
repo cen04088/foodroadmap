@@ -12,6 +12,7 @@ export interface RestaurantListViewProps {
   broadcastFilter: string;
   onBroadcastFilterChange: (broadcast: string) => void;
   onClose: () => void;
+  topOffset: number;
 }
 
 function CloseIcon() {
@@ -35,6 +36,7 @@ export default function RestaurantListView({
   broadcastFilter,
   onBroadcastFilterChange,
   onClose,
+  topOffset,
 }: RestaurantListViewProps) {
   const [screen, setScreen] = useState<"broadcasts" | "restaurants">(broadcastFilter ? "restaurants" : "broadcasts");
   const [broadcasts, setBroadcasts] = useState<BroadcastSummary[] | null>(null);
@@ -67,7 +69,10 @@ export default function RestaurantListView({
   const detailRestaurant = detailId ? filteredRestaurants.find((r) => r.id === detailId) ?? null : null;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-paper text-ink">
+    <div
+      className="fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl border-t border-line bg-paper text-ink shadow-[0_-12px_32px_rgba(0,0,0,0.45)]"
+      style={{ top: topOffset }}
+    >
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4">
         {screen === "broadcasts" ? (
           <h1 className="text-lg font-bold">맛집 목록</h1>

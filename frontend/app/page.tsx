@@ -49,10 +49,22 @@ function HomeContent() {
   const [browseRestaurants, setBrowseRestaurants] = useState<RestaurantSummary[]>([]);
   const [browseBroadcast, setBrowseBroadcast] = useState("");
   const [isListViewOpen, setIsListViewOpen] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const searchSeqRef = useRef(0);
   const browseSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const updateHeight = () => setHeaderHeight(el.getBoundingClientRect().height);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const seq = ++browseSeqRef.current;
@@ -168,7 +180,7 @@ function HomeContent() {
 
       {/* 검색+필터+목록 — 모바일에서는 지금처럼 세로로 쌓이고(display: contents로 위 지도 사이에 끼워짐),
           데스크톱에서는 지도 위에 뜨는 좌측 사이드바 하나로 묶인다. */}
-      <header className="pointer-events-none relative z-20 flex items-center justify-between bg-[#171310]/95 px-5 py-4 text-[#fff7ed] shadow-lg shadow-black/10 backdrop-blur-xl sm:absolute sm:inset-x-0 sm:top-0 sm:bg-[#171310]/85 sm:px-7">
+      <header ref={headerRef} className="pointer-events-none relative z-20 flex items-center justify-between bg-[#171310]/95 px-5 py-4 text-[#fff7ed] shadow-lg shadow-black/10 backdrop-blur-xl sm:absolute sm:inset-x-0 sm:top-0 sm:bg-[#171310]/85 sm:px-7">
         <Link href="/" className="pointer-events-auto">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="맛집로드" className="h-7 w-auto sm:h-8" />
@@ -190,6 +202,7 @@ function HomeContent() {
           broadcastFilter={browseBroadcast}
           onBroadcastFilterChange={setBrowseBroadcast}
           onClose={() => setIsListViewOpen(false)}
+          topOffset={headerHeight}
         />
       )}
 
