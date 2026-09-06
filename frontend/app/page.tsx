@@ -138,7 +138,8 @@ function HomeContent() {
     setListScrollTarget(id);
   }
 
-  const detailRestaurant = detailId ? result?.restaurants.find((r) => r.id === detailId) ?? null : null;
+  const activeRestaurants = result ? result.restaurants : browseRestaurants;
+  const detailRestaurant = detailId ? activeRestaurants.find((r) => r.id === detailId) ?? null : null;
 
   const isJourneyReady = Boolean(result && origin && destination);
 
@@ -149,11 +150,12 @@ function HomeContent() {
       <div ref={mapContainerRef} className="relative order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
         <MapView
           route={result?.route.points ?? []}
-          restaurants={result ? result.restaurants : browseRestaurants}
+          restaurants={activeRestaurants}
           highlightedRestaurantId={selectedId}
           center={mapCenter}
           activeBroadcast={(result ? filters.broadcast : browseBroadcast) || null}
           onMarkerClick={handleMarkerClick}
+          onShowDetail={handleShowDetail}
         />
         {!result && (
           <div className="absolute right-6 top-4 z-10 sm:top-24">

@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { formatDistance, formatDuration } from "../lib/format";
-import type { RestaurantResult } from "../lib/api";
+import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getYoutubeVideoId } from "../lib/youtube";
 import YoutubeModal from "./YoutubeModal";
 
 export interface RestaurantDetailProps {
-  restaurant: RestaurantResult;
+  restaurant: RestaurantSummary & { distance_from_route_km?: number; cumulative_time_sec?: number };
   onBack: () => void;
 }
 
@@ -142,10 +142,12 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
           </div>
         )}
 
-        <div className="mt-4 rounded-xl bg-accent-soft px-4 py-3 text-sm text-ink">
-          <span className="font-bold text-accent-soft-ink">🚗 출발 후 {formatDuration(restaurant.cumulative_time_sec)}</span>
-          <span className="text-ink-muted"> · 경로에서 {formatDistance(restaurant.distance_from_route_km)}</span>
-        </div>
+        {restaurant.distance_from_route_km !== undefined && restaurant.cumulative_time_sec !== undefined && (
+          <div className="mt-4 rounded-xl bg-accent-soft px-4 py-3 text-sm text-ink">
+            <span className="font-bold text-accent-soft-ink">🚗 출발 후 {formatDuration(restaurant.cumulative_time_sec)}</span>
+            <span className="text-ink-muted"> · 경로에서 {formatDistance(restaurant.distance_from_route_km)}</span>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4">
           {restaurant.address && (

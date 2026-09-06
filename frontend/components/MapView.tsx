@@ -50,6 +50,7 @@ export interface MapViewProps {
   center: { lat: number; lng: number } | null;
   activeBroadcast?: string | null;
   onMarkerClick?: (id: string) => void;
+  onShowDetail?: (id: string) => void;
 }
 
 export default function MapView({
@@ -59,6 +60,7 @@ export default function MapView({
   center,
   activeBroadcast = null,
   onMarkerClick,
+  onShowDetail,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -70,6 +72,7 @@ export default function MapView({
   const infoWindowRef = useRef<any>(null);
   const centerRef = useRef(center);
   const onMarkerClickRef = useRef(onMarkerClick);
+  const onShowDetailRef = useRef(onShowDetail);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
@@ -79,6 +82,21 @@ export default function MapView({
   useEffect(() => {
     onMarkerClickRef.current = onMarkerClick;
   }, [onMarkerClick]);
+
+  useEffect(() => {
+    onShowDetailRef.current = onShowDetail;
+  }, [onShowDetail]);
+
+  // 카카오 InfoWindow는 순수 HTML 문자열이라 React 이벤트 핸들러를 못 붙인다 —
+  // "자세히 보기" 버튼의 onclick에서 호출할 전역 함수를 하나 등록해둔다.
+  useEffect(() => {
+    (window as any).__foodmapShowDetail = (id: string) => {
+      onShowDetailRef.current?.(id);
+    };
+    return () => {
+      delete (window as any).__foodmapShowDetail;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,14 +197,14 @@ export default function MapView({
           : escapeHtml(broadcastName ?? "방송 맛집");
         const bottomLine = hasRouteInfo(restaurant)
           ? `출발 후 ${formatDuration(restaurant.cumulative_time_sec)} · 경로에서 ${restaurant.distance_from_route_km.toFixed(1)}km`
-          : restaurant.address
-            ? escapeHtml(restaurant.address)
-            : "";
+          : "";
+        const detailButton = `<button type="button" onclick="window.__foodmapShowDetail && window.__foodmapShowDetail('${restaurant.id}')" style="margin-top:6px;padding:4px 10px;border-radius:9999px;border:1px solid #ff7a1a;background:transparent;color:#ff7a1a;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">자세히 보기</button>`;
         infoWindowRef.current = new kakao.maps.InfoWindow({
           content: `<div style="padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;min-width:120px;">
             <div style="font-size:12px;font-weight:700;color:#ff7a1a;">${topLine}</div>
             <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;">${escapeHtml(restaurant.name)}</div>
             ${bottomLine ? `<div style="margin-top:3px;font-size:12px;color:#78716c;">${bottomLine}</div>` : ""}
+            ${detailButton}
           </div>`,
         });
         infoWindowRef.current.open(map, marker);
