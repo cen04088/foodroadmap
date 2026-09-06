@@ -129,7 +129,7 @@ export default function RestaurantListView({ onClose, topOffset }: RestaurantLis
                     key={b.slug}
                     type="button"
                     onClick={() => handleSelectBroadcast(b.name)}
-                    className="overflow-hidden rounded-2xl border border-line bg-surface text-left transition hover:border-accent/40 hover:shadow-md hover:shadow-black/20"
+                    className="overflow-hidden rounded-2xl border border-line bg-surface text-left transition-all duration-300 hover:border-accent hover:shadow-[0_0_22px_-2px_var(--accent-glow)]"
                   >
                     {image ? (
                       // eslint-disable-next-line @next/next/no-img-element
