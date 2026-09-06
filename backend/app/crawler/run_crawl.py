@@ -8,7 +8,7 @@ from app.crawler.parser import (
     parse_place_detail_page,
 )
 from app.db import make_engine, init_db, make_session_factory
-from app.models import Restaurant, Broadcast
+from app.models import Restaurant, Broadcast, MenuItem
 
 BASE_URL = "https://www.matzipmap.com"
 REQUEST_DELAY_SECONDS = 1.0
@@ -52,6 +52,18 @@ def upsert_restaurant(session, data: dict) -> Restaurant:
         restaurant.longitude = data["longitude"]
     if data.get("youtube_url") is not None:
         restaurant.youtube_url = data["youtube_url"]
+    # 빈 리스트로 덮어쓰지 않는다 — 파싱이 일시적으로/마크업 변경으로 실패해 []를
+    # 반환하면 이미 잘 모아둔 메뉴를 지워버릴 수 있어서, 실제로 뭔가 파싱됐을 때만 교체한다.
+    if data.get("menu"):
+        restaurant.menu_items = [
+            MenuItem(
+                name=item["name"],
+                price_won=item.get("price_won"),
+                is_representative=item.get("is_representative", False),
+                position=item.get("position", 0),
+            )
+            for item in data["menu"]
+        ]
 
     return restaurant
 
@@ -184,6 +196,7 @@ def run_crawl(session_factory=None) -> None:
                             merged["latitude"] = detail.get("latitude")
                             merged["longitude"] = detail.get("longitude")
                             merged["youtube_url"] = detail.get("youtube_url")
+                            merged["menu"] = detail.get("menu")
 
                         upsert_restaurant(session, merged)
 

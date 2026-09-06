@@ -5,7 +5,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.main import app
 from app.api.routes import get_session
 from app.db import init_db, make_session_factory
-from app.models import Broadcast, Restaurant
+from app.models import Broadcast, MenuItem, Restaurant
 
 # 실제 카카오모빌리티 API로 라이브 검증된 구조의 합성 응답 (test_kakao_directions.py의 FAKE_RESPONSE와 동일한 구조).
 FAKE_KAKAO_RESPONSE = {
@@ -55,6 +55,7 @@ def seed(session_factory):
             youtube_url="https://www.youtube.com/watch?v=abc123",
         )
         near.broadcasts.append(ttoganjib)
+        near.menu_items = [MenuItem(name="대표 메뉴", price_won=12000, is_representative=True, position=0)]
 
         far = Restaurant(id="far", name="Far Restaurant", latitude=38.5, longitude=128.5, category="한식")
 
@@ -114,6 +115,7 @@ def test_get_route_restaurants_returns_nearby_restaurant_with_expected_shape(mon
     assert "distance_from_route_km" in near_result
     assert "cumulative_time_sec" in near_result
     assert near_result["youtube_url"] == "https://www.youtube.com/watch?v=abc123"
+    assert near_result["menu"] == [{"name": "대표 메뉴", "price_won": 12000, "is_representative": True}]
 
 
 def test_get_route_restaurants_filters_by_broadcast_query_param(monkeypatch):

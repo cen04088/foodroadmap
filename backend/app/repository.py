@@ -14,7 +14,9 @@ def query_candidate_restaurants(
     broadcast_slug: str | None = None,
     category: str | None = None,
 ) -> list[Restaurant]:
-    stmt = select(Restaurant).options(selectinload(Restaurant.broadcasts)).where(
+    stmt = select(Restaurant).options(
+        selectinload(Restaurant.broadcasts), selectinload(Restaurant.menu_items)
+    ).where(
         Restaurant.latitude.is_not(None),
         Restaurant.longitude.is_not(None),
         Restaurant.latitude.between(min_lat, max_lat),
@@ -39,7 +41,9 @@ def list_all_restaurants(
     category: str | None = None,
     bbox: tuple[float, float, float, float] | None = None,
 ) -> list[Restaurant]:
-    stmt = select(Restaurant).options(selectinload(Restaurant.broadcasts)).where(
+    stmt = select(Restaurant).options(
+        selectinload(Restaurant.broadcasts), selectinload(Restaurant.menu_items)
+    ).where(
         Restaurant.latitude.is_not(None),
         Restaurant.longitude.is_not(None),
     )

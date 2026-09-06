@@ -5,7 +5,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.main import app
 from app.api.routes import get_session
 from app.db import init_db, make_session_factory
-from app.models import Broadcast, Restaurant
+from app.models import Broadcast, MenuItem, Restaurant
 
 
 def make_test_session_factory():
@@ -61,8 +61,38 @@ def test_get_restaurants_returns_all_restaurants_with_coordinates():
     assert result["category"] == "한식"
     assert result["youtube_url"] == "https://www.youtube.com/watch?v=abc"
     assert result["broadcasts"] == ["또간집"]
+    assert result["menu"] == []
     assert "distance_from_route_km" not in result
     assert "cumulative_time_sec" not in result
+
+
+def test_get_restaurants_prioritizes_representative_menu_items_up_to_three():
+    session_factory = make_test_session_factory()
+    with session_factory() as session:
+        restaurant = Restaurant(id="r1", name="Restaurant", latitude=37.5, longitude=127.0)
+        restaurant.menu_items = [
+            MenuItem(name="일반메뉴1", price_won=5000, is_representative=False, position=0),
+            MenuItem(name="대표메뉴1", price_won=9000, is_representative=True, position=1),
+            MenuItem(name="일반메뉴2", price_won=6000, is_representative=False, position=2),
+            MenuItem(name="대표메뉴2", price_won=10000, is_representative=True, position=3),
+            MenuItem(name="일반메뉴3", price_won=7000, is_representative=False, position=4),
+        ]
+        session.add(restaurant)
+        session.commit()
+
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+    client = TestClient(app)
+    try:
+        response = client.get("/api/restaurants")
+    finally:
+        app.dependency_overrides.clear()
+
+    menu = response.json()["restaurants"][0]["menu"]
+    assert len(menu) == 3
+    # 대표 메뉴 두 개가 먼저, 그 다음 일반 메뉴가 순서대로 하나 채워진다.
+    assert [m["name"] for m in menu] == ["대표메뉴1", "대표메뉴2", "일반메뉴1"]
+    assert menu[0] == {"name": "대표메뉴1", "price_won": 9000, "is_representative": True}
+    assert menu[2] == {"name": "일반메뉴1", "price_won": 5000, "is_representative": False}
 
 
 def test_get_restaurants_filters_by_broadcast_query_param():

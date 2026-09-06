@@ -5,6 +5,12 @@ export interface RoutePoint {
   cumulative_time_sec: number;
 }
 
+export interface MenuItemSummary {
+  name: string;
+  price_won: number | null;
+  is_representative: boolean;
+}
+
 export interface RestaurantSummary {
   id: string;
   name: string;
@@ -16,6 +22,7 @@ export interface RestaurantSummary {
   hours: string | null;
   youtube_url: string | null;
   broadcasts: string[];
+  menu: MenuItemSummary[];
 }
 
 export interface RestaurantResult extends RestaurantSummary {

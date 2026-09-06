@@ -12,6 +12,7 @@ from app.repository import list_all_restaurants, list_broadcasts_with_counts, qu
 router = APIRouter()
 
 DEFAULT_RADIUS_KM = 2.0
+MENU_DISPLAY_LIMIT = 3
 # 크롤러를 수동으로 다시 돌릴 때만 바뀌는 데이터라, 몇 분간 캐싱해도 최신성에 문제없다.
 BROWSE_CACHE_CONTROL = "public, max-age=300"
 # km 단위 반경 매칭에는 미터 단위로 촘촘한 카카오 경로 포인트가 다 필요하지 않다 — 매칭 연산량만 줄이고
@@ -35,6 +36,16 @@ def _parse_lat_lng(value: str) -> tuple[float, float]:
         raise HTTPException(status_code=400, detail=f"잘못된 좌표 형식입니다: {value}") from exc
 
 
+def _top_menu_items(restaurant: Restaurant, limit: int = MENU_DISPLAY_LIMIT) -> list[dict]:
+    # 가게가 직접 "대표"로 표시해둔 메뉴를 우선하고, 그게 부족하면 사이트에 있는 원래
+    # 순서로 채운다 — 목록 순서만으로 "대표 메뉴"를 추측하지 않는다 (parser.py 참고).
+    ordered = sorted(restaurant.menu_items, key=lambda m: (not m.is_representative, m.position))
+    return [
+        {"name": m.name, "price_won": m.price_won, "is_representative": m.is_representative}
+        for m in ordered[:limit]
+    ]
+
+
 def _serialize_match(match: RestaurantMatch) -> dict:
     restaurant = match.restaurant
     return {
@@ -50,6 +61,7 @@ def _serialize_match(match: RestaurantMatch) -> dict:
         "distance_from_route_km": round(match.distance_from_route_km, 3),
         "cumulative_time_sec": round(match.cumulative_time_sec),
         "broadcasts": [b.name for b in restaurant.broadcasts],
+        "menu": _top_menu_items(restaurant),
     }
 
 
@@ -65,6 +77,7 @@ def _serialize_restaurant(restaurant: Restaurant) -> dict:
         "hours": restaurant.hours,
         "youtube_url": restaurant.youtube_url,
         "broadcasts": [b.name for b in restaurant.broadcasts],
+        "menu": _top_menu_items(restaurant),
     }
 
 

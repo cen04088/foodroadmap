@@ -1,4 +1,5 @@
 import json
+import re
 
 from bs4 import BeautifulSoup
 
@@ -92,6 +93,43 @@ def _find_restaurant_entity(data) -> dict | None:
     return None
 
 
+def _parse_menu_items(soup: BeautifulSoup) -> list[dict]:
+    """가게가 직접 <b class="pd-menu__tag">대표</b>로 표시해둔 메뉴만 is_representative=True —
+    사이트에 이미 있는 사장님 큐레이션 신호라, 그냥 목록 순서로 "대표 메뉴"를 추측하지 않는다."""
+    menu = soup.select_one(".pd-menu")
+    if not menu:
+        return []
+
+    items = []
+    for position, el in enumerate(menu.select(".pd-menu__item")):
+        name_el = el.select_one(".pd-menu__name")
+        if not name_el:
+            continue
+
+        tag_el = name_el.select_one(".pd-menu__tag")
+        is_representative = tag_el is not None
+        if tag_el:
+            tag_el.extract()
+        name = name_el.get_text(strip=True)
+        if not name:
+            continue
+
+        price_el = el.select_one(".pd-menu__price")
+        price_digits = re.sub(r"[^\d]", "", price_el.get_text(strip=True)) if price_el else ""
+        price_won = int(price_digits) if price_digits else None
+
+        items.append(
+            {
+                "name": name,
+                "price_won": price_won,
+                "is_representative": is_representative,
+                "position": position,
+            }
+        )
+
+    return items
+
+
 def parse_place_detail_page(html: str) -> dict | None:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -115,6 +153,7 @@ def parse_place_detail_page(html: str) -> dict | None:
             "phone": entity.get("telephone"),
             "category": entity.get("servesCuisine"),
             "youtube_url": youtube_link["href"] if youtube_link else None,
+            "menu": _parse_menu_items(soup),
         }
 
     return None

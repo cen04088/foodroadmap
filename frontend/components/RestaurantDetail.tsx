@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatDistance, formatDuration } from "../lib/format";
+import { formatDistance, formatDuration, formatWon } from "../lib/format";
 import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getBroadcastImage } from "../lib/broadcastImages";
@@ -221,6 +221,24 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
             <div className="flex items-center gap-2.5 text-sm text-ink">
               <ClockIcon />
               {restaurant.hours}
+            </div>
+          )}
+
+          {restaurant.menu.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold text-ink-muted">대표 메뉴</span>
+              <div className="flex flex-col gap-2 rounded-xl bg-surface-hover px-3.5 py-3">
+                {restaurant.menu.map((item) => (
+                  <div key={item.name} className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm text-ink">{item.name}</span>
+                    {item.price_won !== null && (
+                      <span className="shrink-0 text-sm font-semibold text-accent-soft-ink">
+                        {formatWon(item.price_won)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

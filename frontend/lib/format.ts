@@ -12,3 +12,7 @@ export function formatDuration(totalSeconds: number): string {
 export function formatDistance(km: number): string {
   return `${km.toFixed(1)}km`;
 }
+
+export function formatWon(won: number): string {
+  return `${won.toLocaleString("ko-KR")}원`;
+}
