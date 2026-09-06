@@ -103,20 +103,25 @@ def backfill_menus(
                         progress_fh.flush()
                     continue
 
-                with session_factory() as session:
-                    restaurant = session.get(Restaurant, external_id)
-                    if restaurant is not None:
-                        restaurant.menu_items = [
-                            MenuItem(
-                                name=item["name"],
-                                price_won=item.get("price_won"),
-                                is_representative=item.get("is_representative", False),
-                                position=item.get("position", 0),
-                            )
-                            for item in menu
-                        ]
-                        session.commit()
-                        updated += 1
+                try:
+                    with session_factory() as session:
+                        restaurant = session.get(Restaurant, external_id)
+                        if restaurant is not None:
+                            restaurant.menu_items = [
+                                MenuItem(
+                                    name=item["name"],
+                                    price_won=item.get("price_won"),
+                                    is_representative=item.get("is_representative", False),
+                                    position=item.get("position", 0),
+                                )
+                                for item in menu
+                            ]
+                            session.commit()
+                            updated += 1
+                except Exception:
+                    # 개별 가게의 이상한 데이터(예: 실제로 한 번 겪은 가격 범위 오버플로우) 하나
+                    # 때문에 몇 시간짜리 백필 전체가 죽어서는 안 된다 — 기록하고 다음으로 넘어간다.
+                    logger.warning("failed to save menu for %s", external_id, exc_info=True)
 
                 if progress_fh:
                     progress_fh.write(f"{external_id}\n")

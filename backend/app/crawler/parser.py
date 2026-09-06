@@ -115,8 +115,14 @@ def _parse_menu_items(soup: BeautifulSoup) -> list[dict]:
             continue
 
         price_el = el.select_one(".pd-menu__price")
-        price_digits = re.sub(r"[^\d]", "", price_el.get_text(strip=True)) if price_el else ""
-        price_won = int(price_digits) if price_digits else None
+        price_won = None
+        if price_el:
+            # 크기별로 "35,000원~150,000원" 같은 가격 범위가 있는 메뉴가 있다 — 숫자만 전부
+            # 이어붙이면(구 코드) 두 가격이 하나로 합쳐져 터무니없는 값이 된다(실제로 DB
+            # Integer 범위를 넘겨 크롤이 죽은 적이 있음). 범위의 첫 번째 가격만 쓴다.
+            match = re.search(r"\d[\d,]*", price_el.get_text(strip=True))
+            if match:
+                price_won = int(match.group(0).replace(",", ""))
 
         items.append(
             {

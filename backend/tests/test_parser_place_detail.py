@@ -55,6 +55,32 @@ def test_parse_place_detail_page_menu_is_empty_list_when_no_menu_section():
     assert result["menu"] == []
 
 
+def test_parse_place_detail_page_menu_uses_first_price_in_a_range():
+    # 크기별 가격 범위("35,000원~150,000원")를 숫자만 이어붙이면(35000150000) DB Integer
+    # 범위를 넘겨서 실제로 프로덕션 백필이 죽은 적이 있다 — 범위의 첫 가격만 써야 한다.
+    html = """
+    <html>
+    <body>
+    <script type="application/ld+json">
+    {"@type": "Restaurant", "name": "테스트식당"}
+    </script>
+    <div class="pd-menu">
+      <ul>
+        <li class="pd-menu__item"><span class="pd-menu__name">신선한 활어회</span><span class="pd-menu__price">35,000원~150,000원</span></li>
+      </ul>
+    </div>
+    </body>
+    </html>
+    """
+
+    result = parse_place_detail_page(html)
+
+    assert result is not None
+    assert result["menu"] == [
+        {"name": "신선한 활어회", "price_won": 35000, "is_representative": False, "position": 0}
+    ]
+
+
 def test_parse_place_detail_page_menu_handles_missing_price_and_no_tag():
     html = """
     <html>

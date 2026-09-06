@@ -211,6 +211,51 @@ def test_backfill_menus_treats_a_hung_fetch_as_a_recoverable_failure():
         assert [m.name for m in place2.menu_items] == ["안심카츠", "치즈카츠"]
 
 
+def test_backfill_menus_continues_past_a_db_save_failure_for_one_restaurant():
+    # Regression test: a price-range menu item once overflowed Postgres's Integer
+    # column and crashed the entire multi-hour backfill run partway through. A
+    # single restaurant's save failure must not stop the rest of the batch.
+    session_factory = make_test_session_factory()
+
+    with session_factory() as session:
+        session.add_all(
+            [
+                Restaurant(id="place-1", name="문제가게"),
+                Restaurant(id="place-2", name="경양카츠 연남점"),
+            ]
+        )
+        session.commit()
+
+    def fake_fetch(url, **kwargs):
+        return DETAIL_HTML_WITH_MENU
+
+    from app import models as models_module
+
+    original_menu_item = models_module.MenuItem
+
+    def raise_for_place_1(*args, **kwargs):
+        raise RuntimeError("simulated DB save failure (e.g. integer out of range)")
+
+    call_count = {"n": 0}
+
+    def selective_menu_item(*args, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise_for_place_1()
+        return original_menu_item(*args, **kwargs)
+
+    with patch("app.crawler.backfill_menu.fetch_url", side_effect=fake_fetch), patch(
+        "app.crawler.backfill_menu.time.sleep"
+    ), patch("app.crawler.backfill_menu.MenuItem", side_effect=selective_menu_item):
+        backfill_menus(session_factory=session_factory, progress_file=None)
+
+    with session_factory() as session:
+        # place-1's save failed and was skipped; place-2 (processed afterward) still succeeded.
+        assert session.get(Restaurant, "place-1").menu_items == []
+        place2 = session.get(Restaurant, "place-2")
+        assert [m.name for m in place2.menu_items] == ["안심카츠", "치즈카츠"]
+
+
 def test_fetch_with_deadline_raises_timeout_error_instead_of_hanging_forever():
     def hangs_forever(url, **kwargs):
         time.sleep(3600)
