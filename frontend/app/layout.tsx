@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,10 +7,24 @@ export const metadata: Metadata = {
   description: "목적지까지 가는 길을 방송 맛집 여행으로 만들어드려요",
 };
 
+const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        {ADSENSE_CLIENT_ID && (
+          // strategy="beforeInteractive"면 이 태그를 어디에 두든 Next.js가 알아서
+          // 문서 <head>로 끌어올려 넣어준다 — 직접 <head> 엘리먼트를 만들 필요 없음.
+          <Script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+            crossOrigin="anonymous"
+            strategy="beforeInteractive"
+          />
+        )}
+        {children}
+      </body>
     </html>
   );
 }
