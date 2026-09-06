@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, fetchAllRestaurants, fetchRouteRestaurants } from "./api";
+import { ApiError, fetchAllRestaurants, fetchBroadcasts, fetchRouteRestaurants } from "./api";
 
 const FAKE_RESPONSE = {
   route: { total_distance_m: 15000, total_duration_sec: 1200, points: [] },
@@ -88,6 +88,39 @@ describe("fetchRouteRestaurants", () => {
     let caught: unknown;
     try {
       await fetchRouteRestaurants(params, "http://localhost:8000");
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(ApiError);
+    expect((caught as ApiError).status).toBe(0);
+  });
+});
+
+describe("fetchBroadcasts", () => {
+  it("requests /api/broadcasts and returns the broadcasts array", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        broadcasts: [{ slug: "ttoganjib", name: "또간집", count: 232 }],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchBroadcasts("http://localhost:8000");
+
+    expect(result).toEqual([{ slug: "ttoganjib", name: "또간집", count: 232 }]);
+    expect(fetchMock.mock.calls[0][0]).toBe("http://localhost:8000/api/broadcasts");
+  });
+
+  it("throws ApiError with status 0 when the network request itself fails", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("network down"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    let caught: unknown;
+    try {
+      await fetchBroadcasts("http://localhost:8000");
     } catch (err) {
       caught = err;
     }
