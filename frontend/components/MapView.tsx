@@ -79,6 +79,7 @@ export default function MapView({
   const mapRef = useRef<any>(null);
   const kakaoRef = useRef<any>(null);
   const polylineRef = useRef<any>(null);
+  const polylineCasingRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const markerMetaRef = useRef<Map<string, { color: string; letter: string; isDimmed: boolean }>>(new Map());
   const highlightedIdRef = useRef<string | null>(null);
@@ -177,17 +178,32 @@ export default function MapView({
     const map = mapRef.current;
     if (!kakao || !map) return;
 
+    if (polylineCasingRef.current) {
+      polylineCasingRef.current.setMap(null);
+      polylineCasingRef.current = null;
+    }
     if (polylineRef.current) {
       polylineRef.current.setMap(null);
       polylineRef.current = null;
     }
     if (route.length > 0) {
       const path = route.map((p) => new kakao.maps.LatLng(p.lat, p.lng));
+      // 카카오 지도 타일 자체가 주요 도로를 비슷한 주황~노랑 톤으로 그려서 단색 오렌지
+      // 경로선이 배경에 묻혔다 — 흰 테두리(casing)를 먼저 깔고 그 위에 인디고 라인을
+      // 얇게 그려서 배경이 무슨 색이든 항상 도드라지게 한다.
+      polylineCasingRef.current = new kakao.maps.Polyline({
+        path,
+        strokeWeight: 9,
+        strokeColor: "#FFFFFF",
+        strokeOpacity: 0.9,
+      });
+      polylineCasingRef.current.setMap(map);
+
       polylineRef.current = new kakao.maps.Polyline({
         path,
-      strokeWeight: 5,
-      strokeColor: "#FF7A1A",
-        strokeOpacity: 0.85,
+        strokeWeight: 5,
+        strokeColor: "#4338CA",
+        strokeOpacity: 1,
       });
       polylineRef.current.setMap(map);
     }
