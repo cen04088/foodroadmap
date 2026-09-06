@@ -24,7 +24,7 @@ export default function YoutubeModal({ videoId, title, onClose }: YoutubeModalPr
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl overflow-hidden rounded-2xl bg-surface shadow-2xl"
+        className="w-full max-w-[1344px] overflow-hidden rounded-2xl bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3">
