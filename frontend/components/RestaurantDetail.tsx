@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatDistance, formatDuration } from "../lib/format";
 import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
+import { getBroadcastImage } from "../lib/broadcastImages";
 import { getYoutubeVideoId } from "../lib/youtube";
 import YoutubeModal from "./YoutubeModal";
 
@@ -80,6 +81,7 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
   const videoId = restaurant.youtube_url ? getYoutubeVideoId(restaurant.youtube_url) : null;
   const primaryBroadcast = restaurant.broadcasts[0] ?? null;
   const { color: programColor, letter: programLetter } = getBroadcastColor(primaryBroadcast ?? "");
+  const programImage = primaryBroadcast ? getBroadcastImage(primaryBroadcast) : null;
 
   async function handleCopyAddress() {
     if (!restaurant.address) return;
@@ -120,6 +122,13 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
             />
             <span className="absolute inset-0 grid place-items-center"><span className="rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-bold text-[#171310] shadow-lg">▶ 방송 영상 보기</span></span>
           </button>
+        ) : programImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={programImage}
+            alt={primaryBroadcast ?? ""}
+            className="mb-4 block aspect-video w-full rounded-xl object-cover"
+          />
         ) : primaryBroadcast ? (
           <div
             className="relative mb-4 flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl"
