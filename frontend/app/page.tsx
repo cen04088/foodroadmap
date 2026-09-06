@@ -50,11 +50,13 @@ function HomeContent() {
   const [browseBroadcast, setBrowseBroadcast] = useState("");
   const [isListViewOpen, setIsListViewOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [logoFailed, setLogoFailed] = useState(false);
   const searchSeqRef = useRef(0);
   const browseSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const logoRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     const el = headerRef.current;
@@ -64,6 +66,15 @@ function HomeContent() {
     const observer = new ResizeObserver(updateHeight);
     observer.observe(el);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    // 서버에서 렌더된 <img>는 하이드레이션 전에 이미 로드를 시도하므로, 그 사이에
+    // 실패하면 onError가 아니라 이 마운트 시점 체크로만 잡힌다.
+    const img = logoRef.current;
+    if (img && img.complete && img.naturalWidth === 0) {
+      setLogoFailed(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -182,8 +193,20 @@ function HomeContent() {
           데스크톱에서는 지도 위에 뜨는 좌측 사이드바 하나로 묶인다. */}
       <header ref={headerRef} className="pointer-events-none relative z-20 flex items-center justify-between bg-[#171310]/95 px-5 py-4 text-[#fff7ed] shadow-lg shadow-black/10 backdrop-blur-xl sm:absolute sm:inset-x-0 sm:top-0 sm:bg-[#171310]/85 sm:px-7">
         <Link href="/" className="pointer-events-auto">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="맛집로드" className="h-7 w-auto sm:h-8" />
+          {logoFailed ? (
+            <span className="text-lg font-black tracking-tight text-[#fff7ed] sm:text-xl">
+              맛집<span className="text-[#ff7a1a]">로드</span>
+            </span>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              ref={logoRef}
+              src="/logo.png"
+              alt="맛집로드"
+              className="h-7 w-auto sm:h-8"
+              onError={() => setLogoFailed(true)}
+            />
+          )}
         </Link>
         <nav className="pointer-events-auto flex items-center gap-4 text-sm text-[#a89c91] sm:gap-6">
           <button
