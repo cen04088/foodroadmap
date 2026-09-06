@@ -2,7 +2,12 @@ import math
 
 import pytest
 
-from app.geo import haversine_km, project_point_onto_segment, bounding_box_with_margin
+from app.geo import (
+    bounding_box_with_margin,
+    downsample_route_points,
+    haversine_km,
+    project_point_onto_segment,
+)
 
 
 def test_haversine_km_zero_for_same_point():
@@ -56,6 +61,30 @@ def test_project_point_onto_segment_degenerate_segment():
     )
     assert distance_km == pytest.approx(haversine_km(37.51, 127.0, 37.5, 127.0), rel=1e-6)
     assert t == 0.0
+
+
+def test_downsample_route_points_returns_input_unchanged_when_within_limit():
+    points = [{"lat": 37.5 + i * 0.001, "lng": 127.0} for i in range(10)]
+    assert downsample_route_points(points, max_points=10) is points
+    assert downsample_route_points(points, max_points=50) is points
+
+
+def test_downsample_route_points_keeps_first_and_last_point():
+    points = [{"lat": 37.5 + i * 0.0001, "lng": 127.0, "cumulative_time_sec": i} for i in range(1000)]
+    result = downsample_route_points(points, max_points=100)
+
+    assert len(result) <= 100
+    assert result[0] == points[0]
+    assert result[-1] == points[-1]
+
+
+def test_downsample_route_points_preserves_order_with_no_duplicates():
+    points = [{"lat": 37.5 + i * 0.0001, "lng": 127.0} for i in range(500)]
+    result = downsample_route_points(points, max_points=50)
+
+    lats = [p["lat"] for p in result]
+    assert lats == sorted(lats)
+    assert len(set(id(p) for p in result)) == len(result)
 
 
 def test_bounding_box_with_margin_expands_by_margin():

@@ -43,6 +43,23 @@ def project_point_onto_segment(
     return distance_km, t
 
 
+def downsample_route_points(points: list[dict], max_points: int) -> list[dict]:
+    """Thin out route points for the O(candidates x segments) matching loop.
+
+    Restaurant-to-route matching only needs km-scale precision, but Kakao's
+    Directions API returns meter-scale points, so a long route can have
+    thousands of segments to check per candidate. Keeping every point isn't
+    necessary for that precision, and always keeping the first/last points
+    preserves the route's overall cumulative distance/time range.
+    """
+    if max_points < 2 or len(points) <= max_points:
+        return points
+
+    step = (len(points) - 1) / (max_points - 1)
+    indices = sorted({round(i * step) for i in range(max_points)})
+    return [points[i] for i in indices]
+
+
 def bounding_box_with_margin(points: list[dict], margin_km: float) -> tuple[float, float, float, float]:
     lats = [p["lat"] for p in points]
     lngs = [p["lng"] for p in points]

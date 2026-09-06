@@ -110,3 +110,15 @@ def test_get_restaurants_filters_by_category_query_param():
     assert response.status_code == 200
     ids = {r["id"] for r in response.json()["restaurants"]}
     assert ids == {"korean"}
+
+
+def test_get_restaurants_sets_cache_control_header():
+    session_factory = make_test_session_factory()
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+    client = TestClient(app)
+    try:
+        response = client.get("/api/restaurants")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.headers["cache-control"] == "public, max-age=300"

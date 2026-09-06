@@ -49,6 +49,8 @@ export interface MapViewProps {
   highlightedRestaurantId: string | null;
   center: { lat: number; lng: number } | null;
   activeBroadcast?: string | null;
+  // 경로 검색 결과는 스탑 순서가 중요해 마커를 뭉치면 안 되고, 전체 브라우징(수천 개)에서만 뭉쳐야 한다.
+  enableClustering?: boolean;
   onMarkerClick?: (id: string) => void;
   onShowDetail?: (id: string) => void;
 }
@@ -59,6 +61,7 @@ export default function MapView({
   highlightedRestaurantId,
   center,
   activeBroadcast = null,
+  enableClustering = false,
   onMarkerClick,
   onShowDetail,
 }: MapViewProps) {
@@ -66,6 +69,7 @@ export default function MapView({
   const mapRef = useRef<any>(null);
   const kakaoRef = useRef<any>(null);
   const polylineRef = useRef<any>(null);
+  const clustererRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const markerMetaRef = useRef<Map<string, { color: string; letter: string }>>(new Map());
   const highlightedIdRef = useRef<string | null>(null);
@@ -109,6 +113,13 @@ export default function MapView({
         mapRef.current = new kakao.maps.Map(containerRef.current, {
           center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
           level: 6,
+        });
+        // minLevel을 굳이 지정하지 않는다 — 지정하면 "그 레벨 이상(더 축소됐을 때)에서만
+        // 클러스터링"이 되는데, 기본 줌 레벨(6)에서부터 곧바로 뭉쳐 보여야 초기 로딩 마커 수가
+        // 실제로 줄어든다. 라이브러리 기본값은 거의 모든 축소 단계에서 클러스터링한다.
+        clustererRef.current = new kakao.maps.MarkerClusterer({
+          map: mapRef.current,
+          averageCenter: true,
         });
 
         // 반응형 레이아웃에서 지도 컨테이너의 최종 크기가 지도 생성 이후에
@@ -168,9 +179,12 @@ export default function MapView({
       infoWindowRef.current = null;
     }
 
+    clustererRef.current?.clear();
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current.clear();
     markerMetaRef.current.clear();
+
+    const markersToCluster: any[] = [];
 
     restaurants.forEach((restaurant, index) => {
       const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
@@ -186,8 +200,11 @@ export default function MapView({
       const marker = new kakao.maps.Marker({
         position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
         image: markerImage,
-        map,
+        map: enableClustering ? null : map,
       });
+      if (enableClustering) {
+        markersToCluster.push(marker);
+      }
       kakao.maps.event.addListener(marker, "click", () => {
         if (infoWindowRef.current) {
           infoWindowRef.current.setMap(null);
@@ -220,7 +237,11 @@ export default function MapView({
       });
       markersRef.current.set(restaurant.id, marker);
     });
-  }, [restaurants, activeBroadcast]);
+
+    if (enableClustering && markersToCluster.length > 0) {
+      clustererRef.current?.addMarkers(markersToCluster);
+    }
+  }, [restaurants, activeBroadcast, enableClustering]);
 
   // 마커 수천 개를 다시 만들지 않고, 이전/새 강조 마커 두 개의 이미지만 교체한다.
   useEffect(() => {

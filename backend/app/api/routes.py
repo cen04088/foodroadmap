@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.config import MissingKakaoApiKeyError, get_kakao_api_key
 from app.db import make_engine, make_session_factory
-from app.geo import bounding_box_with_margin
+from app.geo import bounding_box_with_margin, downsample_route_points
 from app.kakao.directions import KakaoDirectionsError, fetch_route, parse_route_points, parse_route_summary
 from app.matching import RestaurantMatch, match_restaurants_to_route
 from app.models import Restaurant
@@ -12,6 +12,11 @@ from app.repository import list_all_restaurants, list_broadcasts_with_counts, qu
 router = APIRouter()
 
 DEFAULT_RADIUS_KM = 2.0
+# 크롤러를 수동으로 다시 돌릴 때만 바뀌는 데이터라, 몇 분간 캐싱해도 최신성에 문제없다.
+BROWSE_CACHE_CONTROL = "public, max-age=300"
+# km 단위 반경 매칭에는 미터 단위로 촘촘한 카카오 경로 포인트가 다 필요하지 않다 — 매칭 연산량만 줄이고
+# 프론트엔드에 내려주는 route.points(폴리라인용)는 원본 그대로 유지한다.
+MAX_ROUTE_POINTS_FOR_MATCHING = 300
 
 _ENGINE = make_engine()
 _SESSION_FACTORY = make_session_factory(_ENGINE)
@@ -64,16 +69,19 @@ def _serialize_restaurant(restaurant: Restaurant) -> dict:
 
 
 @router.get("/api/broadcasts")
-def get_broadcasts(session: Session = Depends(get_session)):
+def get_broadcasts(response: Response, session: Session = Depends(get_session)):
+    response.headers["Cache-Control"] = BROWSE_CACHE_CONTROL
     return {"broadcasts": list_broadcasts_with_counts(session)}
 
 
 @router.get("/api/restaurants")
 def get_restaurants(
+    response: Response,
     broadcast: str | None = Query(None),
     category: str | None = Query(None),
     session: Session = Depends(get_session),
 ):
+    response.headers["Cache-Control"] = BROWSE_CACHE_CONTROL
     restaurants = list_all_restaurants(session, broadcast_slug=broadcast, category=category)
     return {"restaurants": [_serialize_restaurant(r) for r in restaurants]}
 
@@ -116,7 +124,8 @@ def get_route_restaurants(
     candidates = query_candidate_restaurants(
         session, min_lat, max_lat, min_lng, max_lng, broadcast_slug=broadcast, category=category
     )
-    matches = match_restaurants_to_route(route_points, candidates, radius_km)
+    matching_points = downsample_route_points(route_points, MAX_ROUTE_POINTS_FOR_MATCHING)
+    matches = match_restaurants_to_route(matching_points, candidates, radius_km)
 
     return {
         "route": {

@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.routes import router
 
@@ -18,5 +19,7 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+# 맛집 전체 목록(~3,440건) 응답이 수백 KB에 달해 압축 없이는 전송이 느리다.
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.include_router(router)

@@ -49,3 +49,15 @@ def test_get_broadcasts_returns_counts_of_restaurants_with_coordinates():
     body = response.json()
     by_slug = {b["slug"]: b for b in body["broadcasts"]}
     assert by_slug["ttoganjib"] == {"slug": "ttoganjib", "name": "또간집", "count": 1}
+
+
+def test_get_broadcasts_sets_cache_control_header():
+    session_factory = make_test_session_factory()
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+    client = TestClient(app)
+    try:
+        response = client.get("/api/broadcasts")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.headers["cache-control"] == "public, max-age=300"

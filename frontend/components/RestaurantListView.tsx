@@ -133,7 +133,7 @@ export default function RestaurantListView({
                   >
                     {image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt={b.name} className="aspect-video w-full object-cover" />
+                      <img src={image} alt={b.name} loading="lazy" className="aspect-video w-full object-cover" />
                     ) : (
                       <div className="flex aspect-video w-full items-center justify-center text-2xl font-black text-white" style={{ backgroundColor: color }}>
                         {letter}

@@ -179,6 +179,7 @@ function HomeContent() {
           highlightedRestaurantId={selectedId}
           center={mapCenter}
           activeBroadcast={(result ? filters.broadcast : browseBroadcast) || null}
+          enableClustering={!result}
           onMarkerClick={handleMarkerClick}
           onShowDetail={handleShowDetail}
         />

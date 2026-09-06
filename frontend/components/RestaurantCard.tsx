@@ -35,6 +35,7 @@ export default function RestaurantCard({ restaurant, order, isSelected, onSelect
           <img
             src={thumbnailUrl}
             alt={primaryBroadcast ?? ""}
+            loading="lazy"
             className="h-16 w-16 shrink-0 rounded-lg object-cover"
           />
         ) : primaryBroadcast ? (
