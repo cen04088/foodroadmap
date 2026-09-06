@@ -14,6 +14,10 @@ BASE_URL = "https://www.matzipmap.com"
 REQUEST_DELAY_SECONDS = 1.0
 MAX_PAGES = 100
 
+# 서비스에서 완전히 제외하기로 한 방송 (예: 쯔양 몇끼) — 재크롤링해도 다시
+# 추가되지 않도록 프로그램 목록 단계에서 걸러낸다.
+EXCLUDED_BROADCAST_SLUGS = {"myeotkki"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,7 +124,9 @@ def run_crawl(session_factory=None) -> None:
     try:
         time.sleep(REQUEST_DELAY_SECONDS)
         programs_html = fetch_url(f"{BASE_URL}/broadcasts")
-        programs = parse_broadcasts_list_page(programs_html)
+        programs = [
+            p for p in parse_broadcasts_list_page(programs_html) if p["slug"] not in EXCLUDED_BROADCAST_SLUGS
+        ]
 
         if not programs:
             logger.error(

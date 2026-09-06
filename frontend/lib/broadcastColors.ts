@@ -7,7 +7,6 @@ export const BROADCAST_COLORS: Record<string, BroadcastColor> = {
   또간집: { color: "#E11D48", letter: "또" },
   흑백요리사: { color: "#27272A", letter: "흑" },
   쯔양: { color: "#DB2777", letter: "쯔" },
-  "쯔양 몇끼": { color: "#F472B6", letter: "몇" },
   먹을텐데: { color: "#D97706", letter: "먹" },
   전현무계획: { color: "#2563EB", letter: "전" },
   "허영만의 백반기행": { color: "#65A30D", letter: "허" },

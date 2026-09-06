@@ -84,6 +84,38 @@ def _dispose_test_engines():
         _test_engines.pop().dispose()
 
 
+BROADCASTS_HTML_WITH_EXCLUDED = """
+<a class="lp-net__card" href="/broadcast/ttoganjib">
+  <span class="lp-net__meta"><span class="lp-net__name">또간집</span></span>
+</a>
+<a class="lp-net__card" href="/broadcast/myeotkki">
+  <span class="lp-net__meta"><span class="lp-net__name">쯔양 몇끼</span></span>
+</a>
+"""
+
+
+def test_run_crawl_skips_permanently_excluded_broadcasts():
+    session_factory = make_in_memory_session_factory()
+
+    def fake_fetch(url, **kwargs):
+        if url == f"{BASE_URL}/broadcasts":
+            return BROADCASTS_HTML_WITH_EXCLUDED
+        if url.startswith(f"{BASE_URL}/broadcast/ttoganjib"):
+            return LIST_PAGE_HTML
+        if url == f"{BASE_URL}/place/place-1":
+            return DETAIL_HTML
+        raise AssertionError(f"excluded broadcast should never be fetched: {url}")
+
+    with patch("app.crawler.run_crawl.fetch_url", side_effect=fake_fetch), patch(
+        "app.crawler.run_crawl.time.sleep"
+    ):
+        run_crawl(session_factory=session_factory)
+
+    with session_factory() as session:
+        assert session.get(Broadcast, "ttoganjib") is not None
+        assert session.get(Broadcast, "myeotkki") is None
+
+
 def test_run_crawl_populates_restaurants_and_broadcasts():
     session_factory = make_in_memory_session_factory()
 

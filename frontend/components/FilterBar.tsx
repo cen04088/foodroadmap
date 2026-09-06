@@ -10,7 +10,6 @@ export const BROADCASTS: { value: string; label: string }[] = [
   { value: "또간집", label: "또간집" },
   { value: "흑백요리사", label: "흑백요리사" },
   { value: "쯔양", label: "쯔양" },
-  { value: "쯔양 몇끼", label: "쯔양 몇끼" },
   { value: "먹을텐데", label: "먹을텐데" },
   { value: "전현무계획", label: "전현무계획" },
   { value: "허영만의 백반기행", label: "허영만의 백반기행" },
