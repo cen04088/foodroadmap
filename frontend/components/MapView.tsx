@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
-import type { RestaurantResult, RestaurantSummary, RoutePoint } from "../lib/api";
+import type { MapBounds, RestaurantResult, RestaurantSummary, RoutePoint } from "../lib/api";
 import { formatDuration } from "../lib/format";
 import { getBroadcastColor } from "../lib/broadcastColors";
 
@@ -49,8 +49,9 @@ export interface MapViewProps {
   highlightedRestaurantId: string | null;
   center: { lat: number; lng: number } | null;
   activeBroadcast?: string | null;
-  // 경로 검색 결과는 스탑 순서가 중요해 마커를 뭉치면 안 되고, 전체 브라우징(수천 개)에서만 뭉쳐야 한다.
-  enableClustering?: boolean;
+  // 지도가 멈출 때마다(드래그/줌 종료, 최초 로드 포함) 현재 보이는 영역을 알려준다 —
+  // "현재 지도에서 다시 검색" 버튼을 위해 부모가 이 값을 들고 있다가 쓴다.
+  onBoundsIdle?: (bounds: MapBounds) => void;
   onMarkerClick?: (id: string) => void;
   onShowDetail?: (id: string) => void;
 }
@@ -61,7 +62,7 @@ export default function MapView({
   highlightedRestaurantId,
   center,
   activeBroadcast = null,
-  enableClustering = false,
+  onBoundsIdle,
   onMarkerClick,
   onShowDetail,
 }: MapViewProps) {
@@ -69,7 +70,6 @@ export default function MapView({
   const mapRef = useRef<any>(null);
   const kakaoRef = useRef<any>(null);
   const polylineRef = useRef<any>(null);
-  const clustererRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const markerMetaRef = useRef<Map<string, { color: string; letter: string }>>(new Map());
   const highlightedIdRef = useRef<string | null>(null);
@@ -77,6 +77,7 @@ export default function MapView({
   const centerRef = useRef(center);
   const onMarkerClickRef = useRef(onMarkerClick);
   const onShowDetailRef = useRef(onShowDetail);
+  const onBoundsIdleRef = useRef(onBoundsIdle);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
@@ -90,6 +91,10 @@ export default function MapView({
   useEffect(() => {
     onShowDetailRef.current = onShowDetail;
   }, [onShowDetail]);
+
+  useEffect(() => {
+    onBoundsIdleRef.current = onBoundsIdle;
+  }, [onBoundsIdle]);
 
   // 카카오 InfoWindow는 순수 HTML 문자열이라 React 이벤트 핸들러를 못 붙인다 —
   // "자세히 보기" 버튼의 onclick에서 호출할 전역 함수를 하나 등록해둔다.
@@ -114,13 +119,23 @@ export default function MapView({
           center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
           level: 6,
         });
-        // minLevel을 굳이 지정하지 않는다 — 지정하면 "그 레벨 이상(더 축소됐을 때)에서만
-        // 클러스터링"이 되는데, 기본 줌 레벨(6)에서부터 곧바로 뭉쳐 보여야 초기 로딩 마커 수가
-        // 실제로 줄어든다. 라이브러리 기본값은 거의 모든 축소 단계에서 클러스터링한다.
-        clustererRef.current = new kakao.maps.MarkerClusterer({
-          map: mapRef.current,
-          averageCenter: true,
-        });
+
+        // 드래그/줌이 끝나 지도가 멈출 때마다(idle) 현재 보이는 영역을 부모에 알린다 —
+        // 최초 로드 시에도 한 번 수동으로 쏴줘서 첫 화면 영역 기준으로 바로 데이터를 받을 수 있게 한다.
+        const emitBounds = () => {
+          const bounds = mapRef.current?.getBounds();
+          if (!bounds) return;
+          const sw = bounds.getSouthWest();
+          const ne = bounds.getNorthEast();
+          onBoundsIdleRef.current?.({
+            minLat: sw.getLat(),
+            maxLat: ne.getLat(),
+            minLng: sw.getLng(),
+            maxLng: ne.getLng(),
+          });
+        };
+        kakao.maps.event.addListener(mapRef.current, "idle", emitBounds);
+        emitBounds();
 
         // 반응형 레이아웃에서 지도 컨테이너의 최종 크기가 지도 생성 이후에
         // 확정되면(예: 모바일에서 위쪽 카드 높이가 나중에 정해짐) 카카오맵이
@@ -179,12 +194,9 @@ export default function MapView({
       infoWindowRef.current = null;
     }
 
-    clustererRef.current?.clear();
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current.clear();
     markerMetaRef.current.clear();
-
-    const markersToCluster: any[] = [];
 
     restaurants.forEach((restaurant, index) => {
       const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
@@ -200,11 +212,8 @@ export default function MapView({
       const marker = new kakao.maps.Marker({
         position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
         image: markerImage,
-        map: enableClustering ? null : map,
+        map,
       });
-      if (enableClustering) {
-        markersToCluster.push(marker);
-      }
       kakao.maps.event.addListener(marker, "click", () => {
         if (infoWindowRef.current) {
           infoWindowRef.current.setMap(null);
@@ -237,11 +246,7 @@ export default function MapView({
       });
       markersRef.current.set(restaurant.id, marker);
     });
-
-    if (enableClustering && markersToCluster.length > 0) {
-      clustererRef.current?.addMarkers(markersToCluster);
-    }
-  }, [restaurants, activeBroadcast, enableClustering]);
+  }, [restaurants, activeBroadcast]);
 
   // 마커 수천 개를 다시 만들지 않고, 이전/새 강조 마커 두 개의 이미지만 교체한다.
   useEffect(() => {

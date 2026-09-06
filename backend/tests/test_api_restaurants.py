@@ -112,6 +112,48 @@ def test_get_restaurants_filters_by_category_query_param():
     assert ids == {"korean"}
 
 
+def test_get_restaurants_filters_by_bounding_box_query_params():
+    session_factory = make_test_session_factory()
+    with session_factory() as session:
+        inside = Restaurant(id="inside", name="Inside", latitude=37.55, longitude=127.05)
+        outside = Restaurant(id="outside", name="Outside", latitude=38.5, longitude=128.5)
+        session.add_all([inside, outside])
+        session.commit()
+
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+    client = TestClient(app)
+    try:
+        response = client.get(
+            "/api/restaurants",
+            params={"min_lat": 37.0, "max_lat": 38.0, "min_lng": 126.5, "max_lng": 127.5},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    ids = {r["id"] for r in response.json()["restaurants"]}
+    assert ids == {"inside"}
+
+
+def test_get_restaurants_ignores_bbox_when_only_some_params_given():
+    session_factory = make_test_session_factory()
+    with session_factory() as session:
+        restaurant = Restaurant(id="somewhere", name="Somewhere", latitude=37.55, longitude=127.05)
+        session.add(restaurant)
+        session.commit()
+
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+    client = TestClient(app)
+    try:
+        response = client.get("/api/restaurants", params={"min_lat": 37.0})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    ids = {r["id"] for r in response.json()["restaurants"]}
+    assert ids == {"somewhere"}
+
+
 def test_get_restaurants_sets_cache_control_header():
     session_factory = make_test_session_factory()
     app.dependency_overrides[get_session] = override_get_session_factory(session_factory)

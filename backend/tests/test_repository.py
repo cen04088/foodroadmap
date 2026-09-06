@@ -126,6 +126,20 @@ def test_list_all_restaurants_filters_by_broadcast_slug_or_name():
         assert {r.id for r in by_name} == {"inside"}
 
 
+def test_list_all_restaurants_filters_by_bbox():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed(session)
+
+        results = list_all_restaurants(session, bbox=(37.0, 38.0, 126.5, 127.5))
+
+        ids = {r.id for r in results}
+        assert "inside" in ids
+        assert "wrong-category" in ids
+        assert "outside" not in ids
+        assert "no-coords" not in ids
+
+
 def test_list_broadcasts_with_counts_counts_only_restaurants_with_coordinates():
     session_factory = make_session_factory_in_memory()
     with session_factory() as session:

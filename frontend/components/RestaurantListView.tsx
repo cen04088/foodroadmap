@@ -3,14 +3,11 @@
 import { useEffect, useState } from "react";
 import RestaurantCard from "./RestaurantCard";
 import RestaurantDetail from "./RestaurantDetail";
-import { fetchBroadcasts, type BroadcastSummary, type RestaurantSummary } from "../lib/api";
+import { fetchAllRestaurants, fetchBroadcasts, type BroadcastSummary, type RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getBroadcastImage } from "../lib/broadcastImages";
 
 export interface RestaurantListViewProps {
-  restaurants: RestaurantSummary[];
-  broadcastFilter: string;
-  onBroadcastFilterChange: (broadcast: string) => void;
   onClose: () => void;
   topOffset: number;
 }
@@ -31,15 +28,11 @@ function BackIcon() {
   );
 }
 
-export default function RestaurantListView({
-  restaurants,
-  broadcastFilter,
-  onBroadcastFilterChange,
-  onClose,
-  topOffset,
-}: RestaurantListViewProps) {
-  const [screen, setScreen] = useState<"broadcasts" | "restaurants">(broadcastFilter ? "restaurants" : "broadcasts");
+export default function RestaurantListView({ onClose, topOffset }: RestaurantListViewProps) {
+  const [screen, setScreen] = useState<"broadcasts" | "restaurants">("broadcasts");
   const [broadcasts, setBroadcasts] = useState<BroadcastSummary[] | null>(null);
+  const [selectedBroadcast, setSelectedBroadcast] = useState("");
+  const [restaurants, setRestaurants] = useState<RestaurantSummary[] | null>(null);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -50,22 +43,29 @@ export default function RestaurantListView({
   }, []);
 
   function handleSelectBroadcast(name: string) {
-    onBroadcastFilterChange(name);
+    setSelectedBroadcast(name);
     setCategoryFilter("");
     setScreen("restaurants");
+    setRestaurants(null);
+    fetchAllRestaurants({ broadcast: name })
+      .then(setRestaurants)
+      .catch(() => setRestaurants([]));
   }
 
   function handleBackToBroadcasts() {
     setDetailId(null);
     setCategoryFilter("");
     setScreen("broadcasts");
-    onBroadcastFilterChange("");
+    setSelectedBroadcast("");
+    setRestaurants(null);
   }
 
   const categories = Array.from(
-    new Set(restaurants.map((r) => r.category).filter((c): c is string => Boolean(c)))
+    new Set((restaurants ?? []).map((r) => r.category).filter((c): c is string => Boolean(c)))
   ).sort();
-  const filteredRestaurants = categoryFilter ? restaurants.filter((r) => r.category === categoryFilter) : restaurants;
+  const filteredRestaurants = categoryFilter
+    ? (restaurants ?? []).filter((r) => r.category === categoryFilter)
+    : restaurants ?? [];
   const detailRestaurant = detailId ? filteredRestaurants.find((r) => r.id === detailId) ?? null : null;
 
   return (
@@ -83,7 +83,7 @@ export default function RestaurantListView({
             className="flex items-center gap-1.5 text-lg font-bold text-ink transition hover:text-accent"
           >
             <BackIcon />
-            {broadcastFilter}
+            {selectedBroadcast}
           </button>
         )}
         <button
@@ -152,6 +152,8 @@ export default function RestaurantListView({
           <div className="mx-auto max-w-[560px]">
             <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
           </div>
+        ) : restaurants === null ? (
+          <p className="text-sm text-ink-muted">불러오는 중...</p>
         ) : filteredRestaurants.length === 0 ? (
           <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-sm text-ink-muted">
             조건에 맞는 맛집이 없어요

@@ -79,10 +79,17 @@ def get_restaurants(
     response: Response,
     broadcast: str | None = Query(None),
     category: str | None = Query(None),
+    min_lat: float | None = Query(None),
+    max_lat: float | None = Query(None),
+    min_lng: float | None = Query(None),
+    max_lng: float | None = Query(None),
     session: Session = Depends(get_session),
 ):
     response.headers["Cache-Control"] = BROWSE_CACHE_CONTROL
-    restaurants = list_all_restaurants(session, broadcast_slug=broadcast, category=category)
+    bbox = None
+    if None not in (min_lat, max_lat, min_lng, max_lng):
+        bbox = (min_lat, max_lat, min_lng, max_lng)
+    restaurants = list_all_restaurants(session, broadcast_slug=broadcast, category=category, bbox=bbox)
     return {"restaurants": [_serialize_restaurant(r) for r in restaurants]}
 
 

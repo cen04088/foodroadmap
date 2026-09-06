@@ -14,6 +14,7 @@ import {
   ApiError,
   fetchAllRestaurants,
   fetchRouteRestaurants,
+  type MapBounds,
   type RestaurantSummary,
   type RouteRestaurantsResponse,
 } from "../lib/api";
@@ -46,8 +47,14 @@ function HomeContent() {
   const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [radiusKm, setRadiusKm] = useState(2);
-  const [browseRestaurants, setBrowseRestaurants] = useState<RestaurantSummary[]>([]);
+  const [mapRestaurants, setMapRestaurants] = useState<RestaurantSummary[]>([]);
   const [browseBroadcast, setBrowseBroadcast] = useState("");
+  // viewBounds: 실제로 데이터를 불러온 영역. pendingBounds: 지도가 지금 보여주고 있는 영역.
+  // 이 둘이 달라지면(=사용자가 지도를 옮기면) "이 지역에서 다시 검색" 버튼을 보여주고,
+  // 버튼을 눌러야 viewBounds가 갱신되어 그 영역 데이터를 불러온다 — 드래그할 때마다
+  // 자동으로 다시 불러오지 않는다.
+  const [viewBounds, setViewBounds] = useState<MapBounds | null>(null);
+  const [pendingBounds, setPendingBounds] = useState<MapBounds | null>(null);
   const [isListViewOpen, setIsListViewOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -78,17 +85,37 @@ function HomeContent() {
   }, []);
 
   useEffect(() => {
+    if (!viewBounds) return;
     const seq = ++browseSeqRef.current;
-    fetchAllRestaurants({ broadcast: browseBroadcast || undefined })
+    fetchAllRestaurants({ broadcast: browseBroadcast || undefined, bounds: viewBounds })
       .then((restaurants) => {
         if (seq !== browseSeqRef.current) return;
-        setBrowseRestaurants(restaurants);
+        setMapRestaurants(restaurants);
       })
       .catch(() => {
         if (seq !== browseSeqRef.current) return;
-        setBrowseRestaurants([]);
+        setMapRestaurants([]);
       });
-  }, [browseBroadcast]);
+  }, [browseBroadcast, viewBounds]);
+
+  function roundedBoundsKey(bounds: MapBounds): string {
+    return `${bounds.minLat.toFixed(4)},${bounds.maxLat.toFixed(4)},${bounds.minLng.toFixed(4)},${bounds.maxLng.toFixed(4)}`;
+  }
+
+  function handleBoundsIdle(bounds: MapBounds) {
+    setPendingBounds(bounds);
+    // 최초 idle에서만 곧바로 viewBounds를 채워 첫 화면 영역 기준으로 자동 로드한다 —
+    // 그 이후로는 사용자가 "다시 검색" 버튼을 눌러야 viewBounds가 바뀐다.
+    setViewBounds((current) => current ?? bounds);
+  }
+
+  function handleRefreshArea() {
+    if (pendingBounds) setViewBounds(pendingBounds);
+  }
+
+  const showRefreshArea = Boolean(
+    !result && pendingBounds && viewBounds && roundedBoundsKey(pendingBounds) !== roundedBoundsKey(viewBounds)
+  );
 
   async function runSearch(
     searchOrigin: SelectedPlace,
@@ -163,7 +190,7 @@ function HomeContent() {
     setListScrollTarget(id);
   }
 
-  const activeRestaurants = result ? result.restaurants : browseRestaurants;
+  const activeRestaurants = result ? result.restaurants : mapRestaurants;
   const detailRestaurant = detailId ? activeRestaurants.find((r) => r.id === detailId) ?? null : null;
 
   const isJourneyReady = Boolean(result && origin && destination);
@@ -179,13 +206,24 @@ function HomeContent() {
           highlightedRestaurantId={selectedId}
           center={mapCenter}
           activeBroadcast={(result ? filters.broadcast : browseBroadcast) || null}
-          enableClustering={!result}
+          onBoundsIdle={handleBoundsIdle}
           onMarkerClick={handleMarkerClick}
           onShowDetail={handleShowDetail}
         />
         {!result && (
           <div className="absolute right-6 top-4 z-10 sm:top-24">
             <MapFilter value={browseBroadcast} onChange={setBrowseBroadcast} />
+          </div>
+        )}
+        {showRefreshArea && (
+          <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 sm:top-24">
+            <button
+              type="button"
+              onClick={handleRefreshArea}
+              className="flex items-center gap-1.5 rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-bold text-[#171310] shadow-[0_4px_16px_-4px_rgba(255,122,26,0.6)] transition hover:bg-[#ffb45a]"
+            >
+              🔄 이 지역에서 다시 검색
+            </button>
           </div>
         )}
       </div>
@@ -221,13 +259,7 @@ function HomeContent() {
       </header>
 
       {isListViewOpen && (
-        <RestaurantListView
-          restaurants={browseRestaurants}
-          broadcastFilter={browseBroadcast}
-          onBroadcastFilterChange={setBrowseBroadcast}
-          onClose={() => setIsListViewOpen(false)}
-          topOffset={headerHeight}
-        />
+        <RestaurantListView onClose={() => setIsListViewOpen(false)} topOffset={headerHeight} />
       )}
 
       <div className="contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[390px] sm:flex-col sm:gap-3">

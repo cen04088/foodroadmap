@@ -173,6 +173,26 @@ describe("fetchAllRestaurants", () => {
     expect(calledUrl.searchParams.get("category")).toBe("한식");
   });
 
+  it("includes bounds as min/max lat/lng query params when provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ restaurants: [] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAllRestaurants(
+      { bounds: { minLat: 37.4, maxLat: 37.6, minLng: 126.9, maxLng: 127.1 } },
+      "http://localhost:8000"
+    );
+
+    const calledUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("min_lat")).toBe("37.4");
+    expect(calledUrl.searchParams.get("max_lat")).toBe("37.6");
+    expect(calledUrl.searchParams.get("min_lng")).toBe("126.9");
+    expect(calledUrl.searchParams.get("max_lng")).toBe("127.1");
+  });
+
   it("throws ApiError with the response status on a non-ok response", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,

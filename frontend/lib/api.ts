@@ -95,9 +95,17 @@ export async function fetchBroadcasts(
   return data.broadcasts;
 }
 
+export interface MapBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
 export interface FetchAllRestaurantsParams {
   broadcast?: string;
   category?: string;
+  bounds?: MapBounds;
 }
 
 export async function fetchAllRestaurants(
@@ -107,6 +115,12 @@ export async function fetchAllRestaurants(
   const query = new URLSearchParams();
   if (params.broadcast) query.set("broadcast", params.broadcast);
   if (params.category) query.set("category", params.category);
+  if (params.bounds) {
+    query.set("min_lat", String(params.bounds.minLat));
+    query.set("max_lat", String(params.bounds.maxLat));
+    query.set("min_lng", String(params.bounds.minLng));
+    query.set("max_lng", String(params.bounds.maxLng));
+  }
 
   const qs = query.toString();
   const data = await fetchJson<{ restaurants: RestaurantSummary[] }>(
