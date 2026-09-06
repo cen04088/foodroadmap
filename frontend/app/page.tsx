@@ -167,7 +167,10 @@ function HomeContent() {
       {/* 검색+필터+목록 — 모바일에서는 지금처럼 세로로 쌓이고(display: contents로 위 지도 사이에 끼워짐),
           데스크톱에서는 지도 위에 뜨는 좌측 사이드바 하나로 묶인다. */}
       <header className="pointer-events-none relative z-20 flex items-center justify-between bg-[#171310]/95 px-5 py-4 text-[#fff7ed] shadow-lg shadow-black/10 backdrop-blur-xl sm:absolute sm:inset-x-0 sm:top-0 sm:bg-[#171310]/85 sm:px-7">
-        <Link href="/" className="pointer-events-auto text-xl font-black tracking-[-0.06em] text-[#ffb45a]">FOODMAP</Link>
+        <Link href="/" className="pointer-events-auto">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="맛집로드" className="h-7 w-auto sm:h-8" />
+        </Link>
         <nav className="pointer-events-auto flex items-center gap-4 text-sm text-[#a89c91] sm:gap-6">
           <span className="hidden sm:inline">미식 로드트립</span>
           <Link href="/broadcasts" className="transition hover:text-[#fff7ed]">프로그램</Link>
