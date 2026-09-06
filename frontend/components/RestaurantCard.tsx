@@ -9,11 +9,21 @@ export interface RestaurantCardProps {
   restaurant: RestaurantSummary & { distance_from_route_km?: number; cumulative_time_sec?: number };
   order?: number;
   isSelected: boolean;
+  // 필터에 안 맞는 카드를 목록에서 지우지 않고 흑백+반투명으로 죽여서, 경로 전체 맥락은
+  // 유지하면서 조건에 맞는 것만 도드라져 보이게 한다.
+  isDimmed?: boolean;
   onSelect: (id: string) => void;
   onShowDetail: (id: string) => void;
 }
 
-export default function RestaurantCard({ restaurant, order, isSelected, onSelect, onShowDetail }: RestaurantCardProps) {
+export default function RestaurantCard({
+  restaurant,
+  order,
+  isSelected,
+  isDimmed = false,
+  onSelect,
+  onShowDetail,
+}: RestaurantCardProps) {
   const metaLine = [restaurant.address, restaurant.phone, restaurant.hours].filter(Boolean).join(" · ");
   const hasRouteInfo = restaurant.distance_from_route_km !== undefined && restaurant.cumulative_time_sec !== undefined;
   const thumbnailUrl = getRestaurantThumbnailUrl(restaurant);
@@ -27,7 +37,7 @@ export default function RestaurantCard({ restaurant, order, isSelected, onSelect
         isSelected
           ? "border-accent bg-accent-soft shadow-md shadow-accent/10"
           : "border-line bg-surface hover:border-accent/40 hover:shadow-md hover:shadow-black/5"
-      }`}
+      } ${isDimmed ? "grayscale opacity-50" : ""}`}
     >
       <div className="flex gap-3">
         {thumbnailUrl ? (

@@ -5,6 +5,7 @@ import { loadKakaoMapsSdk } from "../lib/kakaoMap";
 import type { MapBounds, RestaurantResult, RestaurantSummary, RoutePoint } from "../lib/api";
 import { formatDuration } from "../lib/format";
 import { getBroadcastColor } from "../lib/broadcastColors";
+import { matchesFilters, type RestaurantFilterCriteria } from "../lib/restaurantFilter";
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청
 const MARKER_SIZE = 30;
@@ -31,15 +32,19 @@ function pickBroadcastName(restaurant: RestaurantSummary, activeBroadcast: strin
   return restaurant.broadcasts[0] ?? null;
 }
 
-function markerImageDataUrl(color: string, letter: string, isHighlighted: boolean): string {
+function markerImageDataUrl(color: string, letter: string, isHighlighted: boolean, isDimmed: boolean = false): string {
   const size = isHighlighted ? MARKER_SIZE_HIGHLIGHTED : MARKER_SIZE;
+  // 필터에 안 맞는 마커는 지우지 않고 흑백(회색)+반투명으로 죽여서, 재검색 없이도
+  // 조건에 맞는 마커만 도드라져 보이게 한다.
+  const fillColor = isDimmed ? "#9CA3AF" : color;
+  const opacity = isDimmed ? 0.55 : 1;
   const ringColor = isHighlighted ? "#FF7A1A" : "#FFFFFF";
   const ringWidth = isHighlighted ? 3 : 2;
   const r = size / 2 - ringWidth;
   const fontSize = Math.round(size * 0.42);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${
-    isHighlighted ? `<circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="${color}" opacity="0.25"/>` : ""
-  }<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="${color}" stroke="${ringColor}" stroke-width="${ringWidth}"/><text x="${size / 2}" y="${size / 2 + fontSize * 0.35}" font-family="Pretendard, sans-serif" font-size="${fontSize}" font-weight="800" fill="#FFFFFF" text-anchor="middle">${letter}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" opacity="${opacity}">${
+    isHighlighted ? `<circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="${fillColor}" opacity="0.25"/>` : ""
+  }<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="${fillColor}" stroke="${ringColor}" stroke-width="${ringWidth}"/><text x="${size / 2}" y="${size / 2 + fontSize * 0.35}" font-family="Pretendard, sans-serif" font-size="${fontSize}" font-weight="800" fill="#FFFFFF" text-anchor="middle">${letter}</text></svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
@@ -49,6 +54,9 @@ export interface MapViewProps {
   highlightedRestaurantId: string | null;
   center: { lat: number; lng: number } | null;
   activeBroadcast?: string | null;
+  // 지정하면 이 조건에 안 맞는 마커를 지우지 않고 흑백+반투명으로 죽인다 (경로 검색 결과에서
+  // 방송/업종 필터를 바꿔도 재검색 없이 클라이언트에서 바로 처리하기 위함).
+  activeFilters?: RestaurantFilterCriteria | null;
   // 지도가 멈출 때마다(드래그/줌 종료, 최초 로드 포함) 현재 보이는 영역을 알려준다 —
   // "현재 지도에서 다시 검색" 버튼을 위해 부모가 이 값을 들고 있다가 쓴다.
   onBoundsIdle?: (bounds: MapBounds) => void;
@@ -62,6 +70,7 @@ export default function MapView({
   highlightedRestaurantId,
   center,
   activeBroadcast = null,
+  activeFilters = null,
   onBoundsIdle,
   onMarkerClick,
   onShowDetail,
@@ -71,7 +80,7 @@ export default function MapView({
   const kakaoRef = useRef<any>(null);
   const polylineRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
-  const markerMetaRef = useRef<Map<string, { color: string; letter: string }>>(new Map());
+  const markerMetaRef = useRef<Map<string, { color: string; letter: string; isDimmed: boolean }>>(new Map());
   const highlightedIdRef = useRef<string | null>(null);
   const infoWindowRef = useRef<any>(null);
   const centerRef = useRef(center);
@@ -201,11 +210,12 @@ export default function MapView({
     restaurants.forEach((restaurant, index) => {
       const broadcastName = pickBroadcastName(restaurant, activeBroadcast);
       const { color, letter } = getBroadcastColor(broadcastName ?? "");
-      markerMetaRef.current.set(restaurant.id, { color, letter });
+      const isDimmed = activeFilters ? !matchesFilters(restaurant, activeFilters) : false;
+      markerMetaRef.current.set(restaurant.id, { color, letter, isDimmed });
       const isHighlighted = highlightedIdRef.current === restaurant.id;
       const size = isHighlighted ? MARKER_SIZE_HIGHLIGHTED : MARKER_SIZE;
       const markerImage = new kakao.maps.MarkerImage(
-        markerImageDataUrl(color, letter, isHighlighted),
+        markerImageDataUrl(color, letter, isHighlighted, isDimmed),
         new kakao.maps.Size(size, size),
         { offset: new kakao.maps.Point(size / 2, size / 2) }
       );
@@ -246,7 +256,7 @@ export default function MapView({
       });
       markersRef.current.set(restaurant.id, marker);
     });
-  }, [restaurants, activeBroadcast]);
+  }, [restaurants, activeBroadcast, activeFilters]);
 
   // 마커 수천 개를 다시 만들지 않고, 이전/새 강조 마커 두 개의 이미지만 교체한다.
   useEffect(() => {
@@ -261,7 +271,7 @@ export default function MapView({
       if (prevMarker && meta) {
         prevMarker.setImage(
           new kakao.maps.MarkerImage(
-            markerImageDataUrl(meta.color, meta.letter, false),
+            markerImageDataUrl(meta.color, meta.letter, false, meta.isDimmed),
             new kakao.maps.Size(MARKER_SIZE, MARKER_SIZE),
             { offset: new kakao.maps.Point(MARKER_SIZE / 2, MARKER_SIZE / 2) }
           )
@@ -278,7 +288,7 @@ export default function MapView({
 
     marker.setImage(
       new kakao.maps.MarkerImage(
-        markerImageDataUrl(meta.color, meta.letter, true),
+        markerImageDataUrl(meta.color, meta.letter, true, meta.isDimmed),
         new kakao.maps.Size(MARKER_SIZE_HIGHLIGHTED, MARKER_SIZE_HIGHLIGHTED),
         { offset: new kakao.maps.Point(MARKER_SIZE_HIGHLIGHTED / 2, MARKER_SIZE_HIGHLIGHTED / 2) }
       )

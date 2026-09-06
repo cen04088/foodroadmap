@@ -3,10 +3,13 @@
 import { useEffect, useRef } from "react";
 import RestaurantCard from "./RestaurantCard";
 import type { RestaurantResult } from "../lib/api";
+import { matchesFilters, type RestaurantFilterCriteria } from "../lib/restaurantFilter";
 
 export interface RestaurantListProps {
   restaurants: RestaurantResult[];
   selectedId: string | null;
+  // 지정하면 필터에 안 맞는 카드를 지우지 않고 흑백+반투명으로 죽인다 (재검색 없이).
+  activeFilters?: RestaurantFilterCriteria;
   onSelect: (id: string) => void;
   onShowDetail: (id: string) => void;
   scrollToId?: string | null;
@@ -15,6 +18,7 @@ export interface RestaurantListProps {
 export default function RestaurantList({
   restaurants,
   selectedId,
+  activeFilters,
   onSelect,
   onShowDetail,
   scrollToId,
@@ -48,6 +52,7 @@ export default function RestaurantList({
             restaurant={restaurant}
             order={index + 1}
             isSelected={selectedId === restaurant.id}
+            isDimmed={activeFilters ? !matchesFilters(restaurant, activeFilters) : false}
             onSelect={onSelect}
             onShowDetail={onShowDetail}
           />

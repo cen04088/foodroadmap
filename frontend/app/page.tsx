@@ -19,6 +19,7 @@ import {
   type RouteRestaurantsResponse,
 } from "../lib/api";
 import { formatDuration } from "../lib/format";
+import { matchesFilters } from "../lib/restaurantFilter";
 
 function errorMessageFor(error: unknown): string {
   if (error instanceof ApiError) {
@@ -60,7 +61,6 @@ function HomeContent() {
   const [logoFailed, setLogoFailed] = useState(false);
   const searchSeqRef = useRef(0);
   const browseSeqRef = useRef(0);
-  const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
   const logoRef = useRef<HTMLImageElement>(null);
@@ -117,23 +117,20 @@ function HomeContent() {
     !result && pendingBounds && viewBounds && roundedBoundsKey(pendingBounds) !== roundedBoundsKey(viewBounds)
   );
 
-  async function runSearch(
-    searchOrigin: SelectedPlace,
-    searchDestination: SelectedPlace,
-    searchFilters: Filters
-  ) {
+  async function runSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace) {
     const seq = ++searchSeqRef.current;
     setIsLoading(true);
     setErrorMessage(null);
     setDetailId(null);
     try {
+      // 방송/업종 필터는 백엔드에 안 보낸다 — 경로 후보 전체를 한 번만 받아두고,
+      // 필터를 바꿀 때마다 재검색(카카오 길찾기 재호출 포함) 없이 클라이언트에서
+      // 강조/흐림 처리만 한다 (MapView/RestaurantList에 넘기는 activeFilters).
       const response = await fetchRouteRestaurants({
         originLat: searchOrigin.lat,
         originLng: searchOrigin.lng,
         destinationLat: searchDestination.lat,
         destinationLng: searchDestination.lng,
-        broadcast: searchFilters.broadcast || undefined,
-        category: searchFilters.category || undefined,
         radiusKm,
       });
       if (seq !== searchSeqRef.current) return;
@@ -150,25 +147,11 @@ function HomeContent() {
   function handleSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace) {
     setOrigin(searchOrigin);
     setDestination(searchDestination);
-    if (filterDebounceRef.current) {
-      clearTimeout(filterDebounceRef.current);
-      filterDebounceRef.current = null;
-    }
-    runSearch(searchOrigin, searchDestination, filters);
+    runSearch(searchOrigin, searchDestination);
   }
 
   function handleFiltersChange(newFilters: Filters) {
     setFilters(newFilters);
-
-    if (filterDebounceRef.current) {
-      clearTimeout(filterDebounceRef.current);
-    }
-
-    if (origin && destination) {
-      filterDebounceRef.current = setTimeout(() => {
-        runSearch(origin, destination, newFilters);
-      }, 400);
-    }
   }
 
   function handleOriginSelect(place: SelectedPlace) {
@@ -194,6 +177,11 @@ function HomeContent() {
   const detailRestaurant = detailId ? activeRestaurants.find((r) => r.id === detailId) ?? null : null;
 
   const isJourneyReady = Boolean(result && origin && destination);
+  const hasActiveRouteFilter = Boolean(filters.broadcast || filters.category);
+  const filteredMatchCount = result
+    ? result.restaurants.filter((r) => matchesFilters(r, filters)).length
+    : 0;
+  const noFilterMatches = hasActiveRouteFilter && result !== null && result.restaurants.length > 0 && filteredMatchCount === 0;
 
   return (
     <main className="relative flex min-h-screen w-full flex-col overflow-hidden sm:h-screen sm:min-h-0">
@@ -206,6 +194,7 @@ function HomeContent() {
           highlightedRestaurantId={selectedId}
           center={mapCenter}
           activeBroadcast={(result ? filters.broadcast : browseBroadcast) || null}
+          activeFilters={result ? filters : null}
           onBoundsIdle={handleBoundsIdle}
           onMarkerClick={handleMarkerClick}
           onShowDetail={handleShowDetail}
@@ -314,7 +303,19 @@ function HomeContent() {
                   <span className="font-semibold text-[#fff7ed]">{origin?.label} <span className="text-[#a89c91]">→</span> {destination?.label}</span>
                   <span className="text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
                 </div>
-                <RestaurantList restaurants={result.restaurants} selectedId={selectedId} onSelect={handleSelectRestaurant} onShowDetail={handleShowDetail} scrollToId={listScrollTarget} />
+                {noFilterMatches && (
+                  <div className="mb-3 rounded-xl bg-white/5 px-3 py-2 text-xs text-[#a89c91]">
+                    이 조건에 맞는 곳이 없어요 — 경로 전체 결과를 보여드려요
+                  </div>
+                )}
+                <RestaurantList
+                  restaurants={result.restaurants}
+                  selectedId={selectedId}
+                  activeFilters={filters}
+                  onSelect={handleSelectRestaurant}
+                  onShowDetail={handleShowDetail}
+                  scrollToId={listScrollTarget}
+                />
               </>
             ) : (
               <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-white/10 px-4 text-center text-sm text-[#a89c91] sm:border-none">
