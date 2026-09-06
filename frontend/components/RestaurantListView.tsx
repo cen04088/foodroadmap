@@ -89,10 +89,10 @@ export default function RestaurantListView({
         <button
           type="button"
           onClick={onClose}
-          aria-label="목록 닫기"
-          className="grid h-9 w-9 place-items-center rounded-full text-ink-muted transition hover:bg-surface-hover hover:text-ink"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-accent/40 hover:bg-surface-hover"
         >
           <CloseIcon />
+          닫기
         </button>
       </header>
 
