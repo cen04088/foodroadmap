@@ -1,5 +1,7 @@
 "use client";
 
+import BroadcastDropdown from "./BroadcastDropdown";
+
 export interface Filters {
   broadcast: string;
   category: string;
@@ -30,26 +32,13 @@ export interface FilterBarProps {
 export default function FilterBar({ filters, onChange }: FilterBarProps) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
-      <div className="relative flex-1 sm:max-w-[220px]">
-        <select
+      <div className="flex-1 sm:max-w-[220px]">
+        <BroadcastDropdown
           value={filters.broadcast}
-          onChange={(e) => onChange({ ...filters, broadcast: e.target.value })}
-          className="w-full appearance-none rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
-        >
-          {BROADCASTS.map((b) => (
-            <option key={b.value} value={b.value} style={{ backgroundColor: "var(--surface)", color: "var(--ink)" }}>
-              {b.label}
-            </option>
-          ))}
-        </select>
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
-          aria-hidden="true"
-        >
-          <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+          onChange={(broadcast) => onChange({ ...filters, broadcast })}
+          triggerClassName="flex w-full items-center justify-between gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft"
+          chevronClassName="h-4 w-4 text-ink-muted"
+        />
       </div>
       <input
         type="text"
