@@ -22,7 +22,7 @@ export default function MapFilter({ value, onChange }: MapFilterProps) {
       <BroadcastDropdown
         value={value}
         onChange={onChange}
-        triggerClassName="flex w-[150px] items-center justify-between gap-2 py-1 text-sm font-medium text-[#fff7ed]"
+        triggerClassName="flex w-[150px] items-center justify-between gap-2 border-0 bg-transparent py-1 text-sm font-medium text-[#fff7ed]"
         chevronClassName="h-3.5 w-3.5 text-[#a89c91]"
         listClassName="right-0 w-[180px]"
       />

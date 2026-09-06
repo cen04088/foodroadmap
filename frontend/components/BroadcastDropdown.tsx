@@ -57,14 +57,18 @@ export default function BroadcastDropdown({
 
   return (
     <div ref={rootRef} className="relative">
-      <button type="button" onClick={() => setIsOpen((open) => !open)} className={triggerClassName}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        className={`appearance-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${triggerClassName}`}
+      >
         <span className="truncate">{label}</span>
         <ChevronIcon isOpen={isOpen} className={chevronClassName} />
       </button>
       {isOpen && (
         <ul
           role="listbox"
-          className={`absolute z-20 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-line bg-surface py-1 shadow-xl shadow-black/30 ${listClassName ?? "w-full"}`}
+          className={`absolute z-20 mt-1.5 rounded-xl border border-line bg-surface py-1 shadow-xl shadow-black/30 ${listClassName ?? "w-full"}`}
         >
           {BROADCASTS.map((b) => (
             <li key={b.value} role="option" aria-selected={b.value === value}>
@@ -74,7 +78,7 @@ export default function BroadcastDropdown({
                   onChange(b.value);
                   setIsOpen(false);
                 }}
-                className={`block w-full px-3 py-2 text-left text-sm transition ${
+                className={`block w-full px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   b.value === value ? "bg-accent-soft font-semibold text-accent-soft-ink" : "text-ink hover:bg-surface-hover"
                 }`}
               >
