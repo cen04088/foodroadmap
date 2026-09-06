@@ -52,12 +52,6 @@ export interface FetchRouteRestaurantsParams {
   radiusKm?: number;
 }
 
-export interface BroadcastSummary {
-  slug: string;
-  name: string;
-  count: number;
-}
-
 async function fetchJson<T>(path: string, baseUrl: string): Promise<T> {
   let response: Response;
   try {
@@ -86,13 +80,6 @@ export async function fetchRouteRestaurants(
   if (params.radiusKm) query.set("radius_km", String(params.radiusKm));
 
   return fetchJson<RouteRestaurantsResponse>(`/api/route-restaurants?${query.toString()}`, baseUrl);
-}
-
-export async function fetchBroadcasts(
-  baseUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
-): Promise<BroadcastSummary[]> {
-  const data = await fetchJson<{ broadcasts: BroadcastSummary[] }>("/api/broadcasts", baseUrl);
-  return data.broadcasts;
 }
 
 export interface FetchAllRestaurantsParams {

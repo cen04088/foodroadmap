@@ -9,6 +9,7 @@ import MapFilter from "../components/MapFilter";
 import MapView from "../components/MapView";
 import RestaurantList from "../components/RestaurantList";
 import RestaurantDetail from "../components/RestaurantDetail";
+import RestaurantListView from "../components/RestaurantListView";
 import {
   ApiError,
   fetchAllRestaurants,
@@ -47,6 +48,7 @@ function HomeContent() {
   const [radiusKm, setRadiusKm] = useState(2);
   const [browseRestaurants, setBrowseRestaurants] = useState<RestaurantSummary[]>([]);
   const [browseBroadcast, setBrowseBroadcast] = useState("");
+  const [isListViewOpen, setIsListViewOpen] = useState(false);
   const searchSeqRef = useRef(0);
   const browseSeqRef = useRef(0);
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,10 +174,24 @@ function HomeContent() {
           <img src="/logo.png" alt="맛집로드" className="h-7 w-auto sm:h-8" />
         </Link>
         <nav className="pointer-events-auto flex items-center gap-4 text-sm text-[#a89c91] sm:gap-6">
-          <span className="hidden sm:inline">미식 로드트립</span>
-          <Link href="/broadcasts" className="transition hover:text-[#fff7ed]">프로그램</Link>
+          <button
+            type="button"
+            onClick={() => setIsListViewOpen(true)}
+            className="rounded-full bg-[#ff7a1a] px-4 py-1.5 text-sm font-bold text-[#171310] shadow-[0_4px_16px_-4px_rgba(255,122,26,0.6)] transition hover:bg-[#ffb45a]"
+          >
+            🍽 맛집 목록 보기
+          </button>
         </nav>
       </header>
+
+      {isListViewOpen && (
+        <RestaurantListView
+          restaurants={browseRestaurants}
+          broadcastFilter={browseBroadcast}
+          onBroadcastFilterChange={setBrowseBroadcast}
+          onClose={() => setIsListViewOpen(false)}
+        />
+      )}
 
       <div className="contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[390px] sm:flex-col sm:gap-3">
         <div className="order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">

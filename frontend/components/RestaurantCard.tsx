@@ -1,11 +1,12 @@
 "use client";
 
 import { formatDistance, formatDuration } from "../lib/format";
-import type { RestaurantResult } from "../lib/api";
+import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
+import { getRestaurantThumbnailUrl } from "../lib/thumbnail";
 
 export interface RestaurantCardProps {
-  restaurant: RestaurantResult;
+  restaurant: RestaurantSummary & { distance_from_route_km?: number; cumulative_time_sec?: number };
   order?: number;
   isSelected: boolean;
   onSelect: (id: string) => void;
@@ -14,6 +15,10 @@ export interface RestaurantCardProps {
 
 export default function RestaurantCard({ restaurant, order, isSelected, onSelect, onShowDetail }: RestaurantCardProps) {
   const metaLine = [restaurant.address, restaurant.phone, restaurant.hours].filter(Boolean).join(" · ");
+  const hasRouteInfo = restaurant.distance_from_route_km !== undefined && restaurant.cumulative_time_sec !== undefined;
+  const thumbnailUrl = getRestaurantThumbnailUrl(restaurant);
+  const primaryBroadcast = restaurant.broadcasts[0] ?? null;
+  const { color: programColor, letter: programLetter } = getBroadcastColor(primaryBroadcast ?? "");
 
   return (
     <div
@@ -24,48 +29,70 @@ export default function RestaurantCard({ restaurant, order, isSelected, onSelect
           : "border-line bg-surface hover:border-accent/40 hover:shadow-md hover:shadow-black/5"
       }`}
     >
-      <div className="flex items-start gap-3">
-        {order && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-[#171310]">{order}</span>}
-        <span className="flex-1 text-[15px] font-semibold leading-snug text-ink">{restaurant.name}</span>
-        {restaurant.category && (
-          <span className="shrink-0 rounded-full bg-surface-hover px-2.5 py-0.5 text-xs font-medium text-ink-muted">
-            {restaurant.category}
-          </span>
-        )}
-      </div>
+      <div className="flex gap-3">
+        {thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnailUrl}
+            alt={primaryBroadcast ?? ""}
+            className="h-16 w-16 shrink-0 rounded-lg object-cover"
+          />
+        ) : primaryBroadcast ? (
+          <div
+            className="grid h-16 w-16 shrink-0 place-items-center rounded-lg text-xl font-black text-white"
+            style={{ backgroundColor: programColor }}
+          >
+            {programLetter}
+          </div>
+        ) : null}
 
-      <div className="mt-2 text-sm font-semibold text-accent-soft-ink">
-        🚗 출발 후 {formatDuration(restaurant.cumulative_time_sec)}
-        <span className="mx-1.5 font-normal text-line">·</span>
-        <span className="font-normal text-ink-muted">경로에서 {formatDistance(restaurant.distance_from_route_km)}</span>
-      </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            {order && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-[#171310]">{order}</span>}
+            <span className="flex-1 text-[15px] font-semibold leading-snug text-ink">{restaurant.name}</span>
+            {restaurant.category && (
+              <span className="shrink-0 rounded-full bg-surface-hover px-2.5 py-0.5 text-xs font-medium text-ink-muted">
+                {restaurant.category}
+              </span>
+            )}
+          </div>
 
-      {restaurant.broadcasts.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {restaurant.broadcasts.map((b) => (
-            <span
-              key={b}
-              style={{ backgroundColor: getBroadcastColor(b).color }}
-              className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-            >
-              {b}
-            </span>
-          ))}
+          {hasRouteInfo && (
+            <div className="mt-2 text-sm font-semibold text-accent-soft-ink">
+              🚗 출발 후 {formatDuration(restaurant.cumulative_time_sec!)}
+              <span className="mx-1.5 font-normal text-line">·</span>
+              <span className="font-normal text-ink-muted">경로에서 {formatDistance(restaurant.distance_from_route_km!)}</span>
+            </div>
+          )}
+
+          {restaurant.broadcasts.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {restaurant.broadcasts.map((b) => (
+                <span
+                  key={b}
+                  style={{ backgroundColor: getBroadcastColor(b).color }}
+                  className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                >
+                  {b}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {metaLine && <div className="mt-2 text-xs text-ink-muted">{metaLine}</div>}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowDetail(restaurant.id);
+            }}
+            className="mt-2.5 text-xs font-medium text-accent transition hover:text-accent-hover"
+          >
+            자세히 보기
+          </button>
         </div>
-      )}
-
-      {metaLine && <div className="mt-2 text-xs text-ink-muted">{metaLine}</div>}
-
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onShowDetail(restaurant.id);
-        }}
-        className="mt-2.5 text-xs font-medium text-accent transition hover:text-accent-hover"
-      >
-        자세히 보기
-      </button>
+      </div>
     </div>
   );
 }
