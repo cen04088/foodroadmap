@@ -78,6 +78,8 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
   const [copied, setCopied] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const videoId = restaurant.youtube_url ? getYoutubeVideoId(restaurant.youtube_url) : null;
+  const primaryBroadcast = restaurant.broadcasts[0] ?? null;
+  const { color: programColor, letter: programLetter } = getBroadcastColor(primaryBroadcast ?? "");
 
   async function handleCopyAddress() {
     if (!restaurant.address) return;
@@ -104,7 +106,7 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
       </button>
 
       <div className="mt-2 flex-1 overflow-y-auto pb-1">
-        {videoId && (
+        {videoId ? (
           <button
             type="button"
             onClick={() => setShowVideo(true)}
@@ -118,7 +120,25 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
             />
             <span className="absolute inset-0 grid place-items-center"><span className="rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-bold text-[#171310] shadow-lg">▶ 방송 영상 보기</span></span>
           </button>
-        )}
+        ) : primaryBroadcast ? (
+          <div
+            className="relative mb-4 flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl"
+            style={{ backgroundColor: programColor }}
+          >
+            <span
+              aria-hidden="true"
+              className="absolute -right-4 -top-6 select-none text-[8rem] font-black leading-none text-white/15"
+            >
+              {programLetter}
+            </span>
+            <div className="relative flex flex-col items-center gap-2 px-4 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-white/20 text-xl font-black text-white">
+                {programLetter}
+              </span>
+              <span className="text-base font-bold text-white">{primaryBroadcast}</span>
+            </div>
+          </div>
+        ) : null}
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold leading-snug text-ink">{restaurant.name}</h2>
           {restaurant.category && (
