@@ -164,7 +164,7 @@ export default function MapView({
     if (!kakao || !map) return;
 
     if (infoWindowRef.current) {
-      infoWindowRef.current.close();
+      infoWindowRef.current.setMap(null);
       infoWindowRef.current = null;
     }
 
@@ -190,7 +190,7 @@ export default function MapView({
       });
       kakao.maps.event.addListener(marker, "click", () => {
         if (infoWindowRef.current) {
-          infoWindowRef.current.close();
+          infoWindowRef.current.setMap(null);
         }
         const broadcastLabel = `<span style="color:${color};">${escapeHtml(broadcastName ?? "방송 맛집")}</span>`;
         const topLine = hasRouteInfo(restaurant)
@@ -200,15 +200,22 @@ export default function MapView({
           ? `출발 후 ${formatDuration(restaurant.cumulative_time_sec)} · 경로에서 ${restaurant.distance_from_route_km.toFixed(1)}km`
           : "";
         const detailButton = `<button type="button" onclick="window.__foodmapShowDetail && window.__foodmapShowDetail('${restaurant.id}')" style="margin-top:6px;padding:4px 10px;border-radius:9999px;border:1px solid #ff7a1a;background:transparent;color:#ff7a1a;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">자세히 보기</button>`;
-        infoWindowRef.current = new kakao.maps.InfoWindow({
-          content: `<div style="box-sizing:border-box;padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;width:210px;overflow-wrap:break-word;word-break:break-word;">
+        // 카카오 InfoWindow는 자체 말풍선 배경(스킨)을 콘텐츠와 별도로 측정해서
+        // 그리는데, 폰트 로딩 타이밍에 따라 실제 콘텐츠 높이와 어긋나 텍스트가
+        // 흰 박스 밖으로 잘리는 버그가 반복됐다 — CustomOverlay는 우리가 만든
+        // div 자체가 배경이라 이런 불일치가 구조적으로 생길 수 없다.
+        infoWindowRef.current = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
+          xAnchor: 0.5,
+          yAnchor: 1.25,
+          content: `<div style="box-sizing:border-box;width:210px;padding:10px 12px;background:#ffffff;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.2);font-family:'Pretendard Variable',Pretendard,sans-serif;overflow-wrap:break-word;word-break:break-word;">
             <div style="font-size:12px;font-weight:700;">${topLine}</div>
             <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;line-height:1.35;">${escapeHtml(restaurant.name)}</div>
             ${bottomLine ? `<div style="margin-top:3px;font-size:12px;color:#78716c;">${bottomLine}</div>` : ""}
             ${detailButton}
           </div>`,
         });
-        infoWindowRef.current.open(map, marker);
+        infoWindowRef.current.setMap(map);
         onMarkerClickRef.current?.(restaurant.id);
       });
       markersRef.current.set(restaurant.id, marker);
