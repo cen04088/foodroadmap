@@ -192,16 +192,17 @@ export default function MapView({
         if (infoWindowRef.current) {
           infoWindowRef.current.close();
         }
+        const broadcastLabel = `<span style="color:${color};">${escapeHtml(broadcastName ?? "방송 맛집")}</span>`;
         const topLine = hasRouteInfo(restaurant)
-          ? `${index + 1}번째 STOP · ${escapeHtml(broadcastName ?? "방송 맛집")}`
-          : escapeHtml(broadcastName ?? "방송 맛집");
+          ? `<span style="color:#78716c;">${index + 1}번째 STOP · </span>${broadcastLabel}`
+          : broadcastLabel;
         const bottomLine = hasRouteInfo(restaurant)
           ? `출발 후 ${formatDuration(restaurant.cumulative_time_sec)} · 경로에서 ${restaurant.distance_from_route_km.toFixed(1)}km`
           : "";
         const detailButton = `<button type="button" onclick="window.__foodmapShowDetail && window.__foodmapShowDetail('${restaurant.id}')" style="margin-top:6px;padding:4px 10px;border-radius:9999px;border:1px solid #ff7a1a;background:transparent;color:#ff7a1a;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">자세히 보기</button>`;
         infoWindowRef.current = new kakao.maps.InfoWindow({
           content: `<div style="padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;min-width:120px;">
-            <div style="font-size:12px;font-weight:700;color:#ff7a1a;">${topLine}</div>
+            <div style="font-size:12px;font-weight:700;">${topLine}</div>
             <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;">${escapeHtml(restaurant.name)}</div>
             ${bottomLine ? `<div style="margin-top:3px;font-size:12px;color:#78716c;">${bottomLine}</div>` : ""}
             ${detailButton}
