@@ -201,7 +201,7 @@ export default function MapView({
           : "";
         const detailButton = `<button type="button" onclick="window.__foodmapShowDetail && window.__foodmapShowDetail('${restaurant.id}')" style="margin-top:6px;padding:4px 10px;border-radius:9999px;border:1px solid #ff7a1a;background:transparent;color:#ff7a1a;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">자세히 보기</button>`;
         infoWindowRef.current = new kakao.maps.InfoWindow({
-          content: `<div style="box-sizing:border-box;padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;min-width:120px;max-width:200px;overflow-wrap:break-word;word-break:break-word;">
+          content: `<div style="box-sizing:border-box;padding:10px 12px;font-family:'Pretendard Variable',Pretendard,sans-serif;width:210px;overflow-wrap:break-word;word-break:break-word;">
             <div style="font-size:12px;font-weight:700;">${topLine}</div>
             <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;line-height:1.35;">${escapeHtml(restaurant.name)}</div>
             ${bottomLine ? `<div style="margin-top:3px;font-size:12px;color:#78716c;">${bottomLine}</div>` : ""}
