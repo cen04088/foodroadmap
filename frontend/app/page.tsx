@@ -32,6 +32,14 @@ function errorMessageFor(error: unknown): string {
   return "알 수 없는 오류가 발생했습니다";
 }
 
+function Chevron({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+      <path d="M5 8l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function HomeContent() {
   const searchParams = useSearchParams();
   const [origin, setOrigin] = useState<SelectedPlace | null>(null);
@@ -57,6 +65,10 @@ function HomeContent() {
   const [viewBounds, setViewBounds] = useState<MapBounds | null>(null);
   const [pendingBounds, setPendingBounds] = useState<MapBounds | null>(null);
   const [isListViewOpen, setIsListViewOpen] = useState(false);
+  // 검색 결과가 나오면 검색 카드를 한 줄 요약으로 접어 목록에 세로 공간을 넘긴다.
+  // 결과를 보는 동안 입력창 두 개는 쓸 일이 없고, 세로가 짧은 화면에서는 그 높이가
+  // 목록을 한두 칸으로 짜부라뜨리는 주범이다.
+  const [isSearchCollapsed, setIsSearchCollapsed] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [logoFailed, setLogoFailed] = useState(false);
   const searchSeqRef = useRef(0);
@@ -135,6 +147,7 @@ function HomeContent() {
       });
       if (seq !== searchSeqRef.current) return;
       setResult(response);
+      setIsSearchCollapsed(true);
     } catch (error) {
       if (seq !== searchSeqRef.current) return;
       setErrorMessage(errorMessageFor(error));
@@ -177,6 +190,8 @@ function HomeContent() {
   const detailRestaurant = detailId ? activeRestaurants.find((r) => r.id === detailId) ?? null : null;
 
   const isJourneyReady = Boolean(result && origin && destination);
+  // 결과가 있을 때만 접을 수 있다 — 검색 전에 접히면 아무것도 할 수 없는 화면이 된다.
+  const isSearchCardCollapsed = isJourneyReady && isSearchCollapsed;
   const hasActiveRouteFilter = Boolean(filters.broadcast || filters.category);
   const filteredMatchCount = result
     ? result.restaurants.filter((r) => matchesFilters(r, filters)).length
@@ -251,37 +266,70 @@ function HomeContent() {
         <RestaurantListView onClose={() => setIsListViewOpen(false)} topOffset={headerHeight} />
       )}
 
-      <div className="contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[390px] sm:flex-col sm:gap-3">
+      <div className="contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[390px] sm:flex-col sm:gap-3 sm:short:bottom-3 sm:short:top-[68px] sm:short:gap-2">
         <div className="order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
-          <div className="rounded-2xl border border-white/10 bg-[#29201a]/95 p-5 shadow-xl shadow-black/25 backdrop-blur-xl">
-            <div className="mb-5">
-              <p className="text-xs font-bold tracking-[0.16em] text-[#ffb45a]">MY FOOD ROAD</p>
-              <h1 className="mt-1 text-xl font-bold tracking-tight text-[#fff7ed]">{isJourneyReady ? "가는 길의 맛집" : "오늘의 미식 로드트립"}</h1>
-              <p className="mt-1 text-sm text-[#a89c91]">{isJourneyReady ? "시간순으로 들를 곳을 골라보세요" : "목적지까지 가는 길이, 맛집 여행이 됩니다."}</p>
-            </div>
-            <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
-            {!isJourneyReady && (
-              <div className="mt-5 border-t border-white/10 pt-4">
-                <p className="mb-2 text-xs font-medium text-[#a89c91]">추천 반경 <span className="ml-2 text-[#ffb45a]">{radiusKm}km</span></p>
-                <div className="flex gap-2 text-xs">
-                  {[1, 2, 3].map((km) => (
-                    <button
-                      key={km}
-                      type="button"
-                      onClick={() => setRadiusKm(km)}
-                      className={`rounded-full px-3 py-1.5 transition ${
-                        radiusKm === km
-                          ? "bg-[#ff7a1a] font-semibold text-[#171310]"
-                          : "bg-white/5 text-[#a89c91] hover:bg-white/10"
-                      }`}
-                    >
-                      {radiusKm === km ? "●" : "○"} {km}km
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div className="rounded-2xl border border-white/10 bg-[#29201a]/95 p-5 shadow-xl shadow-black/25 backdrop-blur-xl sm:short:p-4">
+            {isSearchCardCollapsed && (
+              <button
+                type="button"
+                onClick={() => setIsSearchCollapsed(false)}
+                aria-expanded={false}
+                className="flex w-full items-center gap-2 text-left transition hover:opacity-80"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#fff7ed]">
+                  {origin?.label} <span className="text-[#a89c91]">→</span> {destination?.label}
+                </span>
+                {result && (
+                  <span className="shrink-0 text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
+                )}
+                <Chevron className="h-4 w-4 shrink-0 text-[#a89c91]" />
+              </button>
             )}
-            {isJourneyReady && <><div className="my-4 border-t border-white/10" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
+            {/* 언마운트하지 않고 숨긴다 — SearchForm이 입력값을 직접 들고 있어서
+                언마운트하면 다시 펼쳤을 때 입력해둔 장소가 사라진다. */}
+            <div className={isSearchCardCollapsed ? "hidden" : undefined}>
+              <div className="mb-5 sm:short:mb-3">
+                <p className="text-xs font-bold tracking-[0.16em] text-[#ffb45a]">MY FOOD ROAD</p>
+                <div className="flex items-start justify-between gap-2">
+                  <h1 className="mt-1 text-xl font-bold tracking-tight text-[#fff7ed] sm:short:text-lg">{isJourneyReady ? "가는 길의 맛집" : "오늘의 미식 로드트립"}</h1>
+                  {isJourneyReady && (
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchCollapsed(true)}
+                      aria-expanded
+                      aria-label="검색창 접기"
+                      className="mt-1 shrink-0 rounded-full p-1 text-[#a89c91] transition hover:bg-white/10 hover:text-[#fff7ed]"
+                    >
+                      <Chevron className="h-4 w-4 rotate-180" />
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-[#a89c91] sm:short:hidden">{isJourneyReady ? "시간순으로 들를 곳을 골라보세요" : "목적지까지 가는 길이, 맛집 여행이 됩니다."}</p>
+              </div>
+              <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
+              {!isJourneyReady && (
+                <div className="mt-5 border-t border-white/10 pt-4 sm:short:mt-3 sm:short:pt-3">
+                  <p className="mb-2 text-xs font-medium text-[#a89c91]">추천 반경 <span className="ml-2 text-[#ffb45a]">{radiusKm}km</span></p>
+                  <div className="flex gap-2 text-xs">
+                    {[1, 2, 3].map((km) => (
+                      <button
+                        key={km}
+                        type="button"
+                        onClick={() => setRadiusKm(km)}
+                        className={`rounded-full px-3 py-1.5 transition ${
+                          radiusKm === km
+                            ? "bg-[#ff7a1a] font-semibold text-[#171310]"
+                            : "bg-white/5 text-[#a89c91] hover:bg-white/10"
+                        }`}
+                      >
+                        {radiusKm === km ? "●" : "○"} {km}km
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {isJourneyReady && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
           </div>
         </div>
 
@@ -294,15 +342,17 @@ function HomeContent() {
         )}
 
         <div className="order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
-          <div className="sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl">
+          <div className="sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2">
             {detailRestaurant ? (
               <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
             ) : result ? (
               <>
-                <div className="mb-3 flex items-center justify-between px-1 pt-1 text-sm">
-                  <span className="font-semibold text-[#fff7ed]">{origin?.label} <span className="text-[#a89c91]">→</span> {destination?.label}</span>
-                  <span className="text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
-                </div>
+                {!isSearchCardCollapsed && (
+                  <div className="mb-3 flex items-center justify-between px-1 pt-1 text-sm">
+                    <span className="font-semibold text-[#fff7ed]">{origin?.label} <span className="text-[#a89c91]">→</span> {destination?.label}</span>
+                    <span className="text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
+                  </div>
+                )}
                 {noFilterMatches && (
                   <div className="mb-3 rounded-xl bg-white/5 px-3 py-2 text-xs text-[#a89c91]">
                     이 조건에 맞는 곳이 없어요 — 경로 전체 결과를 보여드려요

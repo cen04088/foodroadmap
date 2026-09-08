@@ -83,14 +83,14 @@ function PlaceInput({
 
   return (
     <div className="relative w-full">
-      <label className="mb-1.5 block text-sm font-semibold text-[#fff7ed]">{icon} {label}</label>
+      <label className="mb-1.5 block text-sm font-semibold text-[#fff7ed] sm:short:mb-1">{icon} {label}</label>
       <input
         type="text"
         value={query}
         onChange={(e) => handleQueryChange(e.target.value)}
         placeholder={label === "어디서 출발하시나요?" ? "예: 서울역" : "예: 헤이리 예술마을"}
         disabled={sdkError}
-        className="w-full rounded-xl border border-white/10 bg-[#171310]/80 px-4 py-3 text-base text-[#fff7ed] placeholder:text-[#a89c91] outline-none transition focus:border-[#ff7a1a] focus:ring-4 focus:ring-[#ff7a1a]/15 disabled:bg-[#3a2a1e] disabled:text-[#a89c91]"
+        className="w-full rounded-xl border border-white/10 bg-[#171310]/80 px-4 py-3 text-base text-[#fff7ed] sm:short:py-2 sm:short:text-sm placeholder:text-[#a89c91] outline-none transition focus:border-[#ff7a1a] focus:ring-4 focus:ring-[#ff7a1a]/15 disabled:bg-[#3a2a1e] disabled:text-[#a89c91]"
       />
       {sdkError && <p className="mt-1.5 text-xs text-ink-muted">장소 검색을 사용할 수 없어요</p>}
       {showDropdown && (
@@ -158,7 +158,7 @@ export default function SearchForm({ onOriginSelect, onSearch, isLoading }: Sear
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2">
         <PlaceInput label="어디서 출발하시나요?" icon="🚗" onSelect={handleOriginSelect} />
-        <div className="flex items-center gap-3 pl-1" aria-hidden="true">
+        <div className="flex items-center gap-3 pl-1 sm:short:hidden" aria-hidden="true">
           <span className="h-4 w-px bg-line" />
           <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 text-ink-muted">
             <path d="M10 3v14M10 17l-4-4M10 17l4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -170,7 +170,7 @@ export default function SearchForm({ onOriginSelect, onSearch, isLoading }: Sear
         type="button"
         disabled={!origin || !destination || isLoading}
         onClick={handleSubmit}
-        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff7a1a] px-6 py-3.5 text-base font-bold text-[#171310] shadow-[0_8px_28px_-6px_rgba(255,122,26,.45)] transition hover:bg-[#ffb45a] disabled:cursor-not-allowed disabled:bg-[#5c4736] disabled:text-[#a89c91] disabled:shadow-none"
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff7a1a] px-6 py-3.5 text-base font-bold sm:short:mt-1 sm:short:py-2.5 sm:short:text-sm text-[#171310] shadow-[0_8px_28px_-6px_rgba(255,122,26,.45)] transition hover:bg-[#ffb45a] disabled:cursor-not-allowed disabled:bg-[#5c4736] disabled:text-[#a89c91] disabled:shadow-none"
       >
         {isLoading ? <Spinner /> : <SearchIcon />}
         {isLoading ? "경로를 찾는 중" : "경로에서 맛집 찾기"}

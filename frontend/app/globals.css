@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
+/* 세로로 짧은 화면(노트북 13~14인치, 브라우저 확대 125% 등)에서는 좌측 사이드바의
+   검색 카드가 세로 공간을 다 먹어 맛집 목록이 한두 칸만 남는다. 이 variant를 붙인
+   요소는 그런 화면에서만 여백/글자 크기를 줄여 목록 높이를 확보한다. */
+@custom-variant short (@media (max-height: 820px));
+
 :root {
   /* 심야 푸드로드트립: 아스팔트 블랙 위 헤드라이트/포장마차 조명 같은 오렌지 */
   --paper: #171310;
