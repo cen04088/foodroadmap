@@ -18,11 +18,9 @@ export interface SearchFormProps {
 
 function PlaceInput({
   label,
-  icon,
   onSelect,
 }: {
   label: string;
-  icon: string;
   onSelect: (place: SelectedPlace | null) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -83,7 +81,7 @@ function PlaceInput({
 
   return (
     <div className="relative w-full">
-      <label className="mb-1.5 block text-sm font-semibold text-[#fff7ed] sm:short:mb-1">{icon} {label}</label>
+      <label className="mb-1.5 block text-sm font-semibold text-[#fff7ed] sm:short:mb-1">{label}</label>
       <input
         type="text"
         value={query}
@@ -157,14 +155,14 @@ export default function SearchForm({ onOriginSelect, onSearch, isLoading }: Sear
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2">
-        <PlaceInput label="어디서 출발하시나요?" icon="🚗" onSelect={handleOriginSelect} />
+        <PlaceInput label="어디서 출발하시나요?" onSelect={handleOriginSelect} />
         <div className="flex items-center gap-3 pl-1 sm:short:hidden" aria-hidden="true">
           <span className="h-4 w-px bg-line" />
           <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 text-ink-muted">
             <path d="M10 3v14M10 17l-4-4M10 17l4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <PlaceInput label="어디까지 가시나요?" icon="🎯" onSelect={setDestination} />
+        <PlaceInput label="어디까지 가시나요?" onSelect={setDestination} />
       </div>
       <button
         type="button"

@@ -161,6 +161,29 @@ function HomeContent() {
     runSearch(searchOrigin, searchDestination);
   }
 
+  function handleBackToMap() {
+    // 진행 중인 검색이 있으면 그 응답이 뒤늦게 도착해 경로 모드로 되돌려버린다 —
+    // runSearch가 자기 seq를 확인하므로 여기서 seq를 올려 무효화한다.
+    searchSeqRef.current += 1;
+    setIsLoading(false);
+    setResult(null);
+    setOrigin(null);
+    setDestination(null);
+    setSelectedId(null);
+    setDetailId(null);
+    setListScrollTarget(null);
+    setErrorMessage(null);
+    // 검색 카드를 다시 펼친다. SearchForm은 언마운트되지 않아 입력해둔 장소가 남아
+    // 있으므로, 바로 다시 검색할 수 있다.
+    setIsSearchCollapsed(false);
+    // 경로용 방송/업종 필터는 브라우즈 모드에서 안 쓰이니 비운다 (지도 필터는 별도).
+    setFilters({ broadcast: "", category: "" });
+    // 경로를 따라 지도를 옮겨왔을 수 있어서, viewBounds가 지금 보이는 영역과 다르다.
+    // 지금 영역으로 갱신해두면 "이 지역에서 다시 검색"을 한 번 더 누르지 않아도
+    // 곧바로 그 동네 맛집이 찍힌다.
+    if (pendingBounds) setViewBounds(pendingBounds);
+  }
+
   function handleFiltersChange(newFilters: Filters) {
     setFilters(newFilters);
   }
@@ -215,19 +238,27 @@ function HomeContent() {
           onMarkerClick={handleMarkerClick}
           onShowDetail={handleShowDetail}
         />
-        {!result && (
-          <div className="absolute right-6 top-4 z-10 sm:top-24">
+        <div className="absolute right-6 top-4 z-10 sm:top-24">
+          {result ? (
+            <button
+              type="button"
+              onClick={handleBackToMap}
+              className="pointer-events-auto rounded-xl border border-white/10 bg-[#171310]/95 px-3 py-2 text-sm font-medium text-[#fff7ed] shadow-xl shadow-black/30 backdrop-blur-xl transition hover:bg-[#29201a]"
+            >
+              전체 지도 보기
+            </button>
+          ) : (
             <MapFilter value={browseBroadcast} onChange={setBrowseBroadcast} />
-          </div>
-        )}
+          )}
+        </div>
         {showRefreshArea && (
           <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 sm:top-24">
             <button
               type="button"
               onClick={handleRefreshArea}
-              className="flex items-center gap-1.5 rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-bold text-[#171310] shadow-[0_4px_16px_-4px_rgba(255,122,26,0.6)] transition hover:bg-[#ffb45a]"
+              className="rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-bold text-[#171310] shadow-[0_4px_16px_-4px_rgba(255,122,26,0.6)] transition hover:bg-[#ffb45a]"
             >
-              🔄 이 지역에서 다시 검색
+              이 지역에서 다시 검색
             </button>
           </div>
         )}
@@ -298,7 +329,7 @@ function HomeContent() {
               <div className="mb-5 sm:short:mb-3">
                 <p className="text-xs font-bold tracking-[0.16em] text-[#ffb45a]">ON-AIR FOOD ROAD</p>
                 <div className="flex items-start justify-between gap-2">
-                  <h1 className="mt-1 text-xl font-bold tracking-tight text-[#fff7ed] sm:short:text-lg">{isJourneyReady ? "가는 길의 방송 맛집" : "방송 맛집, 가는 길에서"}</h1>
+                  <h1 className="mt-1 text-xl font-bold tracking-tight text-[#fff7ed] sm:short:text-lg">{isJourneyReady ? "가는 길의 방송 맛집" : "가는 길에서 방송 맛집을 확인하세요"}</h1>
                   {isJourneyReady && (
                     <button
                       type="button"
