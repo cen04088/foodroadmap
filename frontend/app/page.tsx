@@ -68,6 +68,9 @@ function HomeContent() {
   // 결과를 보는 동안 입력창 두 개는 쓸 일이 없고, 세로가 짧은 화면에서는 그 높이가
   // 목록을 한두 칸으로 짜부라뜨리는 주범이다.
   const [isSearchCollapsed, setIsSearchCollapsed] = useState(false);
+  // 좌측 패널 전체를 화면 왼쪽으로 밀어 지도를 가리지 않게 하는 상태 (데스크톱 전용 —
+  // 모바일에서는 패널이 지도 위에 떠 있지 않고 세로로 쌓여 있어 접을 이유가 없다).
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [logoFailed, setLogoFailed] = useState(false);
   const searchSeqRef = useRef(0);
@@ -199,6 +202,9 @@ function HomeContent() {
   function handleShowDetail(id: string) {
     setDetailId(id);
     setSelectedId(id);
+    // 상세는 좌측 패널 안에 그려진다 — 접혀 있으면 눌러도 아무 일도 안 일어난 것처럼
+    // 보이므로 펼쳐준다.
+    setIsSidebarCollapsed(false);
   }
 
   function handleMarkerClick(id: string) {
@@ -301,7 +307,26 @@ function HomeContent() {
         <RestaurantListView onClose={() => setIsListViewOpen(false)} topOffset={headerHeight} />
       )}
 
-      <div className="contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[390px] sm:flex-col sm:gap-3 sm:short:bottom-3 sm:short:top-[68px] sm:short:gap-2">
+      {/* 사이드바 접기/펼치기 손잡이 — 데스크톱 전용. 열려 있을 때는 패널 오른쪽 끝에
+          붙어 있고, 접으면 자기 위치만큼 왼쪽으로 이동해 화면 왼쪽 가장자리에 남는다.
+          패널과 함께 translate로 움직이므로 두 요소가 같은 속도로 붙어서 미끄러진다. */}
+      <button
+        type="button"
+        onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+        aria-expanded={!isSidebarCollapsed}
+        aria-label={isSidebarCollapsed ? "검색 패널 펼치기" : "검색 패널 접기"}
+        className={`hidden sm:absolute sm:left-[calc(var(--sidebar-w)+2rem)] sm:top-1/2 sm:z-10 sm:flex sm:h-12 sm:w-7 sm:-translate-y-1/2 sm:items-center sm:justify-center sm:rounded-r-xl sm:border sm:border-l-0 sm:border-white/10 sm:bg-[#171310]/95 sm:text-[#a89c91] sm:shadow-xl sm:shadow-black/30 sm:backdrop-blur-xl sm:transition sm:duration-300 sm:hover:text-[#fff7ed] ${
+          isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-w)+2rem)]" : ""
+        }`}
+      >
+        <Chevron className={`h-4 w-4 ${isSidebarCollapsed ? "-rotate-90" : "rotate-90"}`} />
+      </button>
+
+      <div
+        className={`contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[var(--sidebar-w)] sm:flex-col sm:gap-3 sm:transition-transform sm:duration-300 sm:short:bottom-3 sm:short:top-[68px] sm:short:gap-2 ${
+          isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-w)+1.5rem)]" : ""
+        }`}
+      >
         <div className="relative z-20 order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
           <div className="rounded-2xl border border-white/10 bg-[#29201a]/95 p-5 shadow-xl shadow-black/25 backdrop-blur-xl sm:short:p-4">
             {isSearchCardCollapsed && (
