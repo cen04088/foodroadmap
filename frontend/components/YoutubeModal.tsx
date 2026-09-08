@@ -23,8 +23,13 @@ export default function YoutubeModal({ videoId, title, onClose }: YoutubeModalPr
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onClick={onClose}
     >
+      {/* 높이가 아니라 폭만 제한하면 세로가 짧은 노트북에서 잘린다 — 패널 높이는
+          헤더 + 폭×9/16으로 결정되는데, 오버레이는 세로 스크롤 없이 가운데 정렬이라
+          넘치는 만큼 위아래가 동시에 깎여 나간다. 그래서 화면 높이에서 오버레이 여백
+          (p-4 = 2rem)과 헤더(약 3.5rem)를 뺀 뒤 16/9를 곱해, 16:9를 유지한 채로 세로에
+          들어가는 최대 폭을 직접 구한다. max-h는 헤더가 예상보다 커졌을 때의 안전장치. */}
       <div
-        className="w-full max-w-[1344px] overflow-hidden rounded-2xl bg-surface shadow-2xl"
+        className="max-h-[calc(100dvh_-_2rem)] w-full max-w-[min(1344px,calc((100dvh_-_5.5rem)*16/9))] overflow-hidden rounded-2xl bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3">
