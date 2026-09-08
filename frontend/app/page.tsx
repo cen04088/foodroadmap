@@ -307,16 +307,18 @@ function HomeContent() {
         <RestaurantListView onClose={() => setIsListViewOpen(false)} topOffset={headerHeight} />
       )}
 
-      {/* 사이드바 접기/펼치기 손잡이 — 데스크톱 전용. 열려 있을 때는 패널 오른쪽 끝에
-          붙어 있고, 접으면 자기 위치만큼 왼쪽으로 이동해 화면 왼쪽 가장자리에 남는다.
-          패널과 함께 translate로 움직이므로 두 요소가 같은 속도로 붙어서 미끄러진다. */}
+      {/* 사이드바 접기/펼치기 손잡이 — 데스크톱 전용. 화면 세로 중앙에 혼자 떠 있으면
+          지도 위에 붕 뜬 요소처럼 보여서, 패널 상단 모서리에 붙여 패널의 일부처럼
+          보이게 한다. top 값은 패널을 감싸는 아래 div와 동일하게 맞춰 붙어 보이게 한다.
+          접으면 자기 위치만큼 왼쪽으로 이동해 화면 왼쪽 가장자리에 남는다 — 패널과
+          함께 translate로 움직이므로 두 요소가 같은 속도로 붙어서 미끄러진다. */}
       <button
         type="button"
         onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
         aria-expanded={!isSidebarCollapsed}
         aria-label={isSidebarCollapsed ? "검색 패널 펼치기" : "검색 패널 접기"}
-        className={`hidden sm:absolute sm:left-[calc(var(--sidebar-w)+2rem)] sm:top-1/2 sm:z-10 sm:flex sm:h-12 sm:w-7 sm:-translate-y-1/2 sm:items-center sm:justify-center sm:rounded-r-xl sm:border sm:border-l-0 sm:border-white/10 sm:bg-[#171310]/95 sm:text-[#a89c91] sm:shadow-xl sm:shadow-black/30 sm:backdrop-blur-xl sm:transition sm:duration-300 sm:hover:text-[#fff7ed] ${
-          isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-w)+2rem)]" : ""
+        className={`hidden sm:absolute sm:left-[calc(1.5rem+var(--sidebar-w))] sm:top-24 sm:z-10 sm:flex sm:h-12 sm:w-7 sm:items-center sm:justify-center sm:rounded-r-xl sm:border sm:border-l-0 sm:border-white/10 sm:bg-[#171310]/95 sm:text-[#a89c91] sm:shadow-xl sm:shadow-black/30 sm:backdrop-blur-xl sm:transition sm:duration-300 sm:hover:text-[#fff7ed] sm:short:top-[84px] ${
+          isSidebarCollapsed ? "sm:-translate-x-[calc(1.5rem+var(--sidebar-w))]" : ""
         }`}
       >
         <Chevron className={`h-4 w-4 ${isSidebarCollapsed ? "-rotate-90" : "rotate-90"}`} />
