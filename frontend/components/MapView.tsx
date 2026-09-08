@@ -106,14 +106,19 @@ export default function MapView({
     onBoundsIdleRef.current = onBoundsIdle;
   }, [onBoundsIdle]);
 
-  // 카카오 InfoWindow는 순수 HTML 문자열이라 React 이벤트 핸들러를 못 붙인다 —
-  // "자세히 보기" 버튼의 onclick에서 호출할 전역 함수를 하나 등록해둔다.
+  // 카카오 오버레이는 순수 HTML 문자열이라 React 이벤트 핸들러를 못 붙인다 —
+  // 말풍선 안 버튼들("자세히 보기", 닫기)의 onclick에서 호출할 전역 함수를 등록해둔다.
   useEffect(() => {
     (window as any).__foodmapShowDetail = (id: string) => {
       onShowDetailRef.current?.(id);
     };
+    (window as any).__foodmapCloseOverlay = () => {
+      infoWindowRef.current?.setMap(null);
+      infoWindowRef.current = null;
+    };
     return () => {
       delete (window as any).__foodmapShowDetail;
+      delete (window as any).__foodmapCloseOverlay;
     };
   }, []);
 
@@ -251,6 +256,8 @@ export default function MapView({
         const bottomLine = hasRouteInfo(restaurant)
           ? `출발 후 ${formatDuration(restaurant.cumulative_time_sec)} · 경로에서 ${restaurant.distance_from_route_km.toFixed(1)}km`
           : "";
+        // 인라인 스타일로는 :hover를 못 만들어서 onmouseover/onmouseout으로 색만 바꾼다.
+        const closeButton = `<button type="button" aria-label="닫기" onclick="window.__foodmapCloseOverlay && window.__foodmapCloseOverlay()" onmouseover="this.style.color='#1c1917'" onmouseout="this.style.color='#a8a29e'" style="position:absolute;top:4px;right:4px;display:flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:0;background:transparent;color:#a8a29e;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:15px;line-height:1;cursor:pointer;">✕</button>`;
         const detailButton = `<button type="button" onclick="window.__foodmapShowDetail && window.__foodmapShowDetail('${restaurant.id}')" style="margin-top:6px;padding:4px 10px;border-radius:9999px;border:1px solid #ff7a1a;background:transparent;color:#ff7a1a;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">자세히 보기</button>`;
         // 카카오 InfoWindow는 자체 말풍선 배경(스킨)을 콘텐츠와 별도로 측정해서
         // 그리는데, 폰트 로딩 타이밍에 따라 실제 콘텐츠 높이와 어긋나 텍스트가
@@ -260,8 +267,9 @@ export default function MapView({
           position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
           xAnchor: 0.5,
           yAnchor: 1.25,
-          content: `<div style="box-sizing:border-box;width:210px;padding:10px 12px;background:#ffffff;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.2);font-family:'Pretendard Variable',Pretendard,sans-serif;overflow-wrap:break-word;word-break:break-word;">
-            <div style="font-size:12px;font-weight:700;">${topLine}</div>
+          content: `<div style="position:relative;box-sizing:border-box;width:210px;padding:10px 12px;background:#ffffff;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.2);font-family:'Pretendard Variable',Pretendard,sans-serif;overflow-wrap:break-word;word-break:break-word;">
+            ${closeButton}
+            <div style="padding-right:20px;font-size:12px;font-weight:700;">${topLine}</div>
             <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;line-height:1.35;">${escapeHtml(restaurant.name)}</div>
             ${bottomLine ? `<div style="margin-top:3px;font-size:12px;color:#78716c;">${bottomLine}</div>` : ""}
             ${detailButton}
