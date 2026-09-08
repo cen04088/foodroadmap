@@ -68,7 +68,9 @@ export default function BroadcastDropdown({
       {isOpen && (
         <ul
           role="listbox"
-          className={`absolute z-20 mt-1.5 rounded-xl border border-line bg-surface py-1 shadow-xl shadow-black/30 ${listClassName ?? "w-full"}`}
+          // 방송 14개 × 36px ≈ 510px — 세로가 짧은 화면에서는 목록이 화면 밖으로
+          // 밀려나 아래쪽 방송을 고를 수 없으므로 높이를 잘라 스크롤시킨다.
+          className={`absolute z-20 mt-1.5 max-h-[60vh] overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface py-1 shadow-xl shadow-black/30 ${listClassName ?? "w-full"}`}
         >
           {BROADCASTS.map((b) => (
             <li key={b.value} role="option" aria-selected={b.value === value}>

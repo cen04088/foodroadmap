@@ -90,6 +90,8 @@ export async function fetchRouteRestaurants(
   });
   if (params.broadcast) query.set("broadcast", params.broadcast);
   if (params.category) query.set("category", params.category);
+  // 반경은 프론트에서 안 보내고 백엔드 기본값(2km)에 맡긴다 — 사용자가 고르는 UI를
+  // 없앴으므로 기본값을 양쪽에 중복해두지 않는다. 파라미터 자체는 남겨둔다.
   if (params.radiusKm) query.set("radius_km", String(params.radiusKm));
 
   return fetchJson<RouteRestaurantsResponse>(`/api/route-restaurants?${query.toString()}`, baseUrl);

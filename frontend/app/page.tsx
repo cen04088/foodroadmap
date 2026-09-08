@@ -55,7 +55,6 @@ function HomeContent() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
-  const [radiusKm, setRadiusKm] = useState(2);
   const [mapRestaurants, setMapRestaurants] = useState<RestaurantSummary[]>([]);
   const [browseBroadcast, setBrowseBroadcast] = useState("");
   // viewBounds: 실제로 데이터를 불러온 영역. pendingBounds: 지도가 지금 보여주고 있는 영역.
@@ -143,7 +142,6 @@ function HomeContent() {
         originLng: searchOrigin.lng,
         destinationLat: searchDestination.lat,
         destinationLng: searchDestination.lng,
-        radiusKm,
       });
       if (seq !== searchSeqRef.current) return;
       setResult(response);
@@ -190,6 +188,9 @@ function HomeContent() {
   const detailRestaurant = detailId ? activeRestaurants.find((r) => r.id === detailId) ?? null : null;
 
   const isJourneyReady = Boolean(result && origin && destination);
+  // 검색 후 부제에 쓰는 개수 — RestaurantList는 필터를 강조/흐림에만 쓰고 경로 후보
+  // 전체를 그리므로, 이 값이 실제로 목록에 보이는 칸 수와 같다.
+  const routeCount = result?.restaurants.length ?? 0;
   // 결과가 있을 때만 접을 수 있다 — 검색 전에 접히면 아무것도 할 수 없는 화면이 된다.
   const isSearchCardCollapsed = isJourneyReady && isSearchCollapsed;
   const hasActiveRouteFilter = Boolean(filters.broadcast || filters.category);
@@ -233,7 +234,10 @@ function HomeContent() {
       </div>
 
       {/* 검색+필터+목록 — 모바일에서는 지금처럼 세로로 쌓이고(display: contents로 위 지도 사이에 끼워짐),
-          데스크톱에서는 지도 위에 뜨는 좌측 사이드바 하나로 묶인다. */}
+          데스크톱에서는 지도 위에 뜨는 좌측 사이드바 하나로 묶인다.
+          두 패널의 z-20 / z-0: 각 패널의 backdrop-blur가 stacking context를 만들어서
+          방송 드롭다운이 자기 z-20으로는 카드 밖으로 못 올라온다. 카드가 DOM에서 목록보다
+          앞이라 순서를 안 정해주면 목록이 위에 그려져 펼친 드롭다운을 덮어버린다. */}
       <header ref={headerRef} className="pointer-events-none relative z-20 flex items-center justify-between bg-[#171310]/95 px-5 py-4 text-[#fff7ed] shadow-lg shadow-black/10 backdrop-blur-xl sm:absolute sm:inset-x-0 sm:top-0 sm:bg-[#171310]/85 sm:px-7">
         <Link href="/" className="pointer-events-auto">
           {logoFailed ? (
@@ -267,7 +271,7 @@ function HomeContent() {
       )}
 
       <div className="contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[390px] sm:flex-col sm:gap-3 sm:short:bottom-3 sm:short:top-[68px] sm:short:gap-2">
-        <div className="order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
+        <div className="relative z-20 order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
           <div className="rounded-2xl border border-white/10 bg-[#29201a]/95 p-5 shadow-xl shadow-black/25 backdrop-blur-xl sm:short:p-4">
             {isSearchCardCollapsed && (
               <button
@@ -280,7 +284,10 @@ function HomeContent() {
                   {origin?.label} <span className="text-[#a89c91]">→</span> {destination?.label}
                 </span>
                 {result && (
-                  <span className="shrink-0 text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
+                  <span className="shrink-0 text-xs text-[#ffb45a]">
+                    {formatDuration(result.route.total_duration_sec)}
+                    {routeCount > 0 && ` · ${routeCount}곳`}
+                  </span>
                 )}
                 <Chevron className="h-4 w-4 shrink-0 text-[#a89c91]" />
               </button>
@@ -289,9 +296,9 @@ function HomeContent() {
                 언마운트하면 다시 펼쳤을 때 입력해둔 장소가 사라진다. */}
             <div className={isSearchCardCollapsed ? "hidden" : undefined}>
               <div className="mb-5 sm:short:mb-3">
-                <p className="text-xs font-bold tracking-[0.16em] text-[#ffb45a]">MY FOOD ROAD</p>
+                <p className="text-xs font-bold tracking-[0.16em] text-[#ffb45a]">ON-AIR FOOD ROAD</p>
                 <div className="flex items-start justify-between gap-2">
-                  <h1 className="mt-1 text-xl font-bold tracking-tight text-[#fff7ed] sm:short:text-lg">{isJourneyReady ? "가는 길의 맛집" : "오늘의 미식 로드트립"}</h1>
+                  <h1 className="mt-1 text-xl font-bold tracking-tight text-[#fff7ed] sm:short:text-lg">{isJourneyReady ? "가는 길의 방송 맛집" : "방송 맛집, 가는 길에서"}</h1>
                   {isJourneyReady && (
                     <button
                       type="button"
@@ -304,30 +311,15 @@ function HomeContent() {
                     </button>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-[#a89c91] sm:short:hidden">{isJourneyReady ? "시간순으로 들를 곳을 골라보세요" : "목적지까지 가는 길이, 맛집 여행이 됩니다."}</p>
+                <p className="mt-1 text-sm text-[#a89c91] sm:short:hidden">
+                  {!isJourneyReady
+                    ? "TV·유튜브에 나온 맛집만 골라 경로 위에 놓아드려요"
+                    : routeCount > 0
+                      ? `지나가는 순서대로 ${routeCount}곳`
+                      : "경로 근처에서 방송 맛집을 찾지 못했어요"}
+                </p>
               </div>
               <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
-              {!isJourneyReady && (
-                <div className="mt-5 border-t border-white/10 pt-4 sm:short:mt-3 sm:short:pt-3">
-                  <p className="mb-2 text-xs font-medium text-[#a89c91]">추천 반경 <span className="ml-2 text-[#ffb45a]">{radiusKm}km</span></p>
-                  <div className="flex gap-2 text-xs">
-                    {[1, 2, 3].map((km) => (
-                      <button
-                        key={km}
-                        type="button"
-                        onClick={() => setRadiusKm(km)}
-                        className={`rounded-full px-3 py-1.5 transition ${
-                          radiusKm === km
-                            ? "bg-[#ff7a1a] font-semibold text-[#171310]"
-                            : "bg-white/5 text-[#a89c91] hover:bg-white/10"
-                        }`}
-                      >
-                        {radiusKm === km ? "●" : "○"} {km}km
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             {isJourneyReady && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
           </div>
@@ -341,7 +333,7 @@ function HomeContent() {
           </div>
         )}
 
-        <div className="order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
+        <div className="relative z-0 order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
           <div className="sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2">
             {detailRestaurant ? (
               <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
