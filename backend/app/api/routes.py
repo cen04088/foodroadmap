@@ -1,13 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.config import MissingKakaoApiKeyError, get_kakao_api_key
+from app.config import (
+    MissingAdminTokenError,
+    MissingKakaoApiKeyError,
+    get_admin_token,
+    get_kakao_api_key,
+)
 from app.db import make_engine, make_session_factory
 from app.geo import bounding_box_with_margin, downsample_route_points
 from app.kakao.directions import KakaoDirectionsError, fetch_route, parse_route_points, parse_route_summary
 from app.matching import RestaurantMatch, match_restaurants_to_route
 from app.models import Restaurant
-from app.repository import list_all_restaurants, list_broadcasts_with_counts, query_candidate_restaurants
+from app.repository import (
+    count_suggestions_from_ip_since,
+    create_suggestion,
+    list_all_restaurants,
+    list_broadcasts_with_counts,
+    list_suggestions,
+    query_candidate_restaurants,
+)
 
 router = APIRouter()
 
@@ -18,6 +33,12 @@ BROWSE_CACHE_CONTROL = "public, max-age=300"
 # km 단위 반경 매칭에는 미터 단위로 촘촘한 카카오 경로 포인트가 다 필요하지 않다 — 매칭 연산량만 줄이고
 # 프론트엔드에 내려주는 route.points(폴리라인용)는 원본 그대로 유지한다.
 MAX_ROUTE_POINTS_FOR_MATCHING = 300
+# 건의함은 인증이 없는 쓰기 경로라, 한 IP가 짧은 시간에 쏟아붓지 못하게 막는다.
+SUGGESTION_RATE_LIMIT = 5
+SUGGESTION_RATE_WINDOW = timedelta(hours=1)
+SUGGESTION_KINDS = ("improvement", "broadcast")
+SUGGESTION_BODY_MAX = 2000
+SUGGESTION_CONTACT_MAX = 200
 
 _ENGINE = make_engine()
 _SESSION_FACTORY = make_session_factory(_ENGINE)
@@ -154,4 +175,104 @@ def get_route_restaurants(
             "points": route_points,
         },
         "restaurants": [_serialize_match(m) for m in matches],
+    }
+
+
+class SuggestionRequest(BaseModel):
+    kind: str
+    body: str = Field(min_length=1, max_length=SUGGESTION_BODY_MAX)
+    contact: str | None = Field(default=None, max_length=SUGGESTION_CONTACT_MAX)
+
+    @field_validator("kind")
+    @classmethod
+    def kind_must_be_known(cls, value: str) -> str:
+        if value not in SUGGESTION_KINDS:
+            raise ValueError(f"kind must be one of {SUGGESTION_KINDS}")
+        return value
+
+    @field_validator("body")
+    @classmethod
+    def body_must_not_be_blank(cls, value: str) -> str:
+        # 공백만 보낸 요청은 min_length를 통과하므로 따로 막는다.
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("body must not be blank")
+        return stripped
+
+    @field_validator("contact")
+    @classmethod
+    def blank_contact_is_none(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+def _client_ip(request: Request) -> str | None:
+    # Railway 같은 프록시 뒤에서는 request.client.host가 프록시 주소라, 원 IP는
+    # X-Forwarded-For의 첫 항목에 들어 있다.
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",")[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else None
+
+
+@router.post("/api/suggestions", status_code=201)
+def post_suggestion(
+    payload: SuggestionRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    client_ip = _client_ip(request)
+
+    if client_ip:
+        recent = count_suggestions_from_ip_since(session, client_ip, now - SUGGESTION_RATE_WINDOW)
+        if recent >= SUGGESTION_RATE_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail="잠시 후 다시 시도해주세요, 한 시간에 보낼 수 있는 건의는 5건입니다",
+            )
+
+    suggestion = create_suggestion(
+        session,
+        kind=payload.kind,
+        body=payload.body,
+        contact=payload.contact,
+        client_ip=client_ip,
+        created_at=now,
+    )
+    return {"id": suggestion.id}
+
+
+@router.get("/api/suggestions")
+def get_suggestions(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    x_admin_token: str | None = Header(default=None),
+    session: Session = Depends(get_session),
+):
+    """건의 목록 조회 — 연락처가 들어 있으니 토큰 없이는 절대 열지 않는다."""
+    try:
+        expected = get_admin_token()
+    except MissingAdminTokenError as exc:
+        raise HTTPException(status_code=503, detail="관리자 토큰이 설정되지 않았습니다") from exc
+
+    if x_admin_token != expected:
+        raise HTTPException(status_code=401, detail="인증에 실패했습니다")
+
+    suggestions = list_suggestions(session, limit=limit, offset=offset)
+    return {
+        "suggestions": [
+            {
+                "id": s.id,
+                "kind": s.kind,
+                "body": s.body,
+                "contact": s.contact,
+                "created_at": s.created_at.isoformat(),
+            }
+            for s in suggestions
+        ]
     }

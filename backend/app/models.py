@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String, Table
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Table, Text
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -56,3 +56,23 @@ class Broadcast(Base):
     restaurants = relationship(
         "Restaurant", secondary=restaurant_broadcasts, back_populates="broadcasts"
     )
+
+
+class Suggestion(Base):
+    """사용자가 보낸 개선 의견과 방송/유튜버 추가 요청.
+
+    크롤러가 채우는 다른 테이블과 달리 외부 입력이 그대로 들어오는 유일한 곳이라,
+    길이 제한과 IP 기준 레이트리밋은 API 계층에서 반드시 거쳐야 한다.
+    """
+
+    __tablename__ = "suggestions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # "improvement"(개선사항) 또는 "broadcast"(방송·유튜버 추가 요청).
+    kind = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    # 답장을 원할 때만 남기는 연락처 — 없어도 제출된다.
+    contact = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, index=True)
+    # 레이트리밋 판단에만 쓴다. 프록시 뒤라 X-Forwarded-For를 우선한다.
+    client_ip = Column(String, nullable=True, index=True)

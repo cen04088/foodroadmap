@@ -138,3 +138,36 @@ export async function fetchAllRestaurants(
   );
   return data.restaurants;
 }
+
+export type SuggestionKind = "improvement" | "broadcast";
+
+export interface SubmitSuggestionParams {
+  kind: SuggestionKind;
+  body: string;
+  contact?: string;
+}
+
+export async function submitSuggestion(
+  params: SubmitSuggestionParams,
+  baseUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/api/suggestions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: params.kind,
+        body: params.body,
+        // 빈 문자열을 보내면 서버가 공백으로 받아 null 처리하지만, 아예 안 보내는 게 명확하다.
+        ...(params.contact ? { contact: params.contact } : {}),
+      }),
+    });
+  } catch {
+    throw new ApiError(0, "네트워크 오류: 서버에 연결할 수 없습니다");
+  }
+
+  if (!response.ok) {
+    throw new ApiError(response.status, `요청 실패: ${response.status}`);
+  }
+}

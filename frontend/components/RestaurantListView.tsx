@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import RestaurantCard from "./RestaurantCard";
 import RestaurantDetail from "./RestaurantDetail";
+import SuggestionBox from "./SuggestionBox";
 import { fetchAllRestaurants, fetchBroadcasts, type BroadcastSummary, type RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getBroadcastImage } from "../lib/broadcastImages";
@@ -29,7 +30,7 @@ function BackIcon() {
 }
 
 export default function RestaurantListView({ onClose, topOffset }: RestaurantListViewProps) {
-  const [screen, setScreen] = useState<"broadcasts" | "restaurants">("broadcasts");
+  const [screen, setScreen] = useState<"broadcasts" | "restaurants" | "suggestion">("broadcasts");
   const [broadcasts, setBroadcasts] = useState<BroadcastSummary[] | null>(null);
   const [selectedBroadcast, setSelectedBroadcast] = useState("");
   const [restaurants, setRestaurants] = useState<RestaurantSummary[] | null>(null);
@@ -83,17 +84,28 @@ export default function RestaurantListView({ onClose, topOffset }: RestaurantLis
             className="flex items-center gap-1.5 text-lg font-bold text-ink transition hover:text-accent"
           >
             <BackIcon />
-            {selectedBroadcast}
+            {screen === "suggestion" ? "건의함" : selectedBroadcast}
           </button>
         )}
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-accent/40 hover:bg-surface-hover"
-        >
-          <CloseIcon />
-          닫기
-        </button>
+        <div className="flex items-center gap-2">
+          {screen !== "suggestion" && (
+            <button
+              type="button"
+              onClick={() => setScreen("suggestion")}
+              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-accent/40 hover:bg-surface-hover"
+            >
+              건의함
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-accent/40 hover:bg-surface-hover"
+          >
+            <CloseIcon />
+            닫기
+          </button>
+        </div>
       </header>
 
       {screen === "restaurants" && !detailRestaurant && categories.length > 0 && (
@@ -116,7 +128,9 @@ export default function RestaurantListView({ onClose, topOffset }: RestaurantLis
       )}
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-        {screen === "broadcasts" ? (
+        {screen === "suggestion" ? (
+          <SuggestionBox />
+        ) : screen === "broadcasts" ? (
           !broadcasts ? (
             <p className="text-sm text-ink-muted">불러오는 중...</p>
           ) : (
