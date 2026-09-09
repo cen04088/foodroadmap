@@ -39,7 +39,7 @@ export default function RestaurantList({
   }
 
   return (
-    <div className="flex flex-col gap-3 overflow-y-auto">
+    <div className="no-scrollbar flex flex-col gap-3 overflow-y-auto">
       {restaurants.map((restaurant, index) => (
         <div
           key={restaurant.id}

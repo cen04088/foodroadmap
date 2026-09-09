@@ -6,6 +6,15 @@
    요소는 그런 화면에서만 여백/글자 크기를 줄여 목록 높이를 확보한다. */
 @custom-variant short (@media (max-height: 820px));
 
+/* 스크롤 동작은 그대로 두고 스크롤바만 감춘다. 좌측 패널은 지도 위에 떠 있는
+   반투명 카드라, 회색 막대가 지도와 카드 위로 겹쳐 보여 지저분하다. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 :root {
   /* 심야 푸드로드트립: 아스팔트 블랙 위 헤드라이트/포장마차 조명 같은 오렌지 */
   --paper: #171310;

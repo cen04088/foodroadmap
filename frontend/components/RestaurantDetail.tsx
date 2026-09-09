@@ -107,7 +107,7 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
         목록으로
       </button>
 
-      <div className="mt-2 flex-1 overflow-y-auto pb-1">
+      <div className="no-scrollbar mt-2 flex-1 overflow-y-auto pb-1">
         {videoId ? (
           <button
             type="button"
