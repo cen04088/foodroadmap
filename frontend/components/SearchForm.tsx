@@ -11,21 +11,30 @@ export interface SelectedPlace {
 }
 
 export interface SearchFormProps {
-  onOriginSelect?: (place: SelectedPlace) => void;
+  // 선택이 풀렸을 때(사용자가 다시 타이핑) null도 올라온다 — 부모가 폼 상태를 그대로
+  // 들고 있어야 "저장한 곳 -> 출발지로"로 한쪽만 바꿔 넣어도 나머지가 살아남는다.
+  onOriginChange?: (place: SelectedPlace | null) => void;
+  onDestinationChange?: (place: SelectedPlace | null) => void;
   onSearch: (origin: SelectedPlace, destination: SelectedPlace) => void;
   isLoading: boolean;
+  // 공유 링크로 들어온 경우 URL에 실려 있던 장소 — 입력창을 채워두어야 사용자가
+  // 어떤 경로를 보고 있는지 알 수 있고, 한쪽만 바꿔 다시 검색할 수 있다.
+  initialOrigin?: SelectedPlace | null;
+  initialDestination?: SelectedPlace | null;
 }
 
 function PlaceInput({
   label,
+  initialPlace,
   onSelect,
 }: {
   label: string;
+  initialPlace?: SelectedPlace | null;
   onSelect: (place: SelectedPlace | null) => void;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialPlace?.label ?? "");
   const [suggestions, setSuggestions] = useState<PlaceResult[]>([]);
-  const [selected, setSelected] = useState<SelectedPlace | null>(null);
+  const [selected, setSelected] = useState<SelectedPlace | null>(initialPlace ?? null);
   const [hasSearched, setHasSearched] = useState(false);
   const [sdkError, setSdkError] = useState(false);
   const kakaoRef = useRef<any>(null);
@@ -135,15 +144,25 @@ function Spinner() {
   );
 }
 
-export default function SearchForm({ onOriginSelect, onSearch, isLoading }: SearchFormProps) {
-  const [origin, setOrigin] = useState<SelectedPlace | null>(null);
-  const [destination, setDestination] = useState<SelectedPlace | null>(null);
+export default function SearchForm({
+  onOriginChange,
+  onDestinationChange,
+  onSearch,
+  isLoading,
+  initialOrigin,
+  initialDestination,
+}: SearchFormProps) {
+  const [origin, setOrigin] = useState<SelectedPlace | null>(initialOrigin ?? null);
+  const [destination, setDestination] = useState<SelectedPlace | null>(initialDestination ?? null);
 
   function handleOriginSelect(place: SelectedPlace | null) {
     setOrigin(place);
-    if (place) {
-      onOriginSelect?.(place);
-    }
+    onOriginChange?.(place);
+  }
+
+  function handleDestinationSelect(place: SelectedPlace | null) {
+    setDestination(place);
+    onDestinationChange?.(place);
   }
 
   function handleSubmit() {
@@ -155,14 +174,14 @@ export default function SearchForm({ onOriginSelect, onSearch, isLoading }: Sear
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2">
-        <PlaceInput label="어디서 출발하시나요?" onSelect={handleOriginSelect} />
+        <PlaceInput label="어디서 출발하시나요?" initialPlace={initialOrigin} onSelect={handleOriginSelect} />
         <div className="flex items-center gap-3 pl-1 sm:short:hidden" aria-hidden="true">
           <span className="h-4 w-px bg-line" />
           <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 text-ink-muted">
             <path d="M10 3v14M10 17l-4-4M10 17l4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <PlaceInput label="어디까지 가시나요?" onSelect={setDestination} />
+        <PlaceInput label="어디까지 가시나요?" initialPlace={initialDestination} onSelect={handleDestinationSelect} />
       </div>
       <button
         type="button"

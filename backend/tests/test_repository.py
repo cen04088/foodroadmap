@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
 from app.db import init_db, make_session_factory
-from app.models import Broadcast, Restaurant
+from app.models import Broadcast, MenuItem, Restaurant
 from app.repository import list_all_restaurants, list_broadcasts_with_counts, query_candidate_restaurants
 
 
@@ -163,3 +163,75 @@ def test_list_broadcasts_with_counts_counts_only_restaurants_with_coordinates():
         assert by_slug["ttoganjib"]["count"] == 1
         assert by_slug["empty"]["name"] == "텅빈방송"
         assert by_slug["empty"]["count"] == 0
+
+
+def seed_priced(session):
+    """가격 필터의 기준 선택을 확인하기 위한 데이터.
+
+    cheap_side_dish가 핵심 케이스 — 공기밥 1,000원 때문에 최저가 기준으로는 "1만원
+    이하"에 걸리지만, 대표 메뉴는 25,000원이라 실제로는 그 구간이 아니다.
+    """
+    budget = Restaurant(id="budget", name="Budget", latitude=37.55, longitude=127.05)
+    budget.menu_items = [
+        MenuItem(name="김밥", price_won=4000, is_representative=True, position=0),
+    ]
+
+    cheap_side_dish = Restaurant(id="side-dish", name="SideDish", latitude=37.55, longitude=127.05)
+    cheap_side_dish.menu_items = [
+        MenuItem(name="한우 코스", price_won=25000, is_representative=True, position=0),
+        MenuItem(name="공기밥", price_won=1000, is_representative=False, position=1),
+    ]
+
+    # 대표 표시가 하나도 없으면 전체 메뉴 최저가로 폴백한다.
+    no_representative = Restaurant(id="no-rep", name="NoRep", latitude=37.55, longitude=127.05)
+    no_representative.menu_items = [
+        MenuItem(name="파스타", price_won=15000, is_representative=False, position=0),
+        MenuItem(name="샐러드", price_won=12000, is_representative=False, position=1),
+    ]
+
+    no_price = Restaurant(id="no-price", name="NoPrice", latitude=37.55, longitude=127.05)
+    no_price.menu_items = [MenuItem(name="시가", price_won=None, is_representative=True, position=0)]
+
+    session.add_all([budget, cheap_side_dish, no_representative, no_price])
+    session.commit()
+
+
+def test_price_filter_uses_representative_menu_not_cheapest_side_dish():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_priced(session)
+
+        results = list_all_restaurants(session, max_price=10000)
+
+        ids = {r.id for r in results}
+        assert ids == {"budget"}, "공기밥 1,000원이 있는 가게가 1만원 이하로 잡히면 안 된다"
+
+
+def test_price_filter_falls_back_to_cheapest_when_no_representative_menu():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_priced(session)
+
+        results = list_all_restaurants(session, min_price=10000, max_price=20000)
+
+        ids = {r.id for r in results}
+        assert ids == {"no-rep"}, "대표 메뉴가 없으면 전체 최저가(12,000원)를 기준으로 삼는다"
+
+
+def test_price_filter_excludes_restaurants_without_any_price():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_priced(session)
+
+        assert {r.id for r in list_all_restaurants(session)} >= {"no-price"}
+        assert "no-price" not in {r.id for r in list_all_restaurants(session, max_price=1000000)}
+
+
+def test_price_filter_applies_to_route_candidates_too():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_priced(session)
+
+        results = query_candidate_restaurants(session, 37.0, 38.0, 126.5, 127.5, max_price=10000)
+
+        assert {r.id for r in results} == {"budget"}

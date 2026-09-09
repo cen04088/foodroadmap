@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import SearchForm, { type SelectedPlace } from "../components/SearchForm";
 import FilterBar, { type Filters } from "../components/FilterBar";
 import MapFilter from "../components/MapFilter";
@@ -10,6 +10,7 @@ import MapView from "../components/MapView";
 import RestaurantList from "../components/RestaurantList";
 import RestaurantDetail from "../components/RestaurantDetail";
 import RestaurantListView from "../components/RestaurantListView";
+import SavedPlacesView from "../components/SavedPlacesView";
 import {
   ApiError,
   fetchAllRestaurants,
@@ -19,6 +20,8 @@ import {
   type RouteRestaurantsResponse,
 } from "../lib/api";
 import { formatDuration } from "../lib/format";
+import { useFavorites, type FavoritePlace } from "../lib/favorites";
+import { findPriceBucket } from "../lib/priceBuckets";
 import { matchesFilters } from "../lib/restaurantFilter";
 
 function errorMessageFor(error: unknown): string {
@@ -32,6 +35,28 @@ function errorMessageFor(error: unknown): string {
   return "알 수 없는 오류가 발생했습니다";
 }
 
+// 출발지·목적지는 이름과 좌표가 모두 있어야 복원되므로 세 개의 파라미터로 나눠 싣는다 —
+// "이름@위도,경도" 한 덩어리로 넣으면 이름에 쉼표나 @가 들어갔을 때 다시 못 쪼갠다.
+function placeFromParams(
+  params: URLSearchParams,
+  prefix: "from" | "to"
+): SelectedPlace | null {
+  const label = params.get(prefix);
+  const lat = Number(params.get(`${prefix}_lat`));
+  const lng = Number(params.get(`${prefix}_lng`));
+  if (!label || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { label, lat, lng };
+}
+
+function CrosshairIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+      <circle cx="10" cy="10" r="4" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Chevron({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
@@ -42,11 +67,18 @@ function Chevron({ className }: { className?: string }) {
 
 function HomeContent() {
   const searchParams = useSearchParams();
-  const [origin, setOrigin] = useState<SelectedPlace | null>(null);
-  const [destination, setDestination] = useState<SelectedPlace | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  // 최초 렌더의 URL을 한 번만 붙잡아 둔다 — 이후로는 상태가 URL을 쓰는 단방향이라,
+  // 매 렌더에 searchParams를 다시 읽으면 우리가 쓴 값을 되읽어 루프가 된다.
+  // (ref가 아니라 state인 이유: 렌더 중에 읽어야 하는 값이다.)
+  const [initialParams] = useState(() => new URLSearchParams(searchParams.toString()));
+  const [origin, setOrigin] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "from"));
+  const [destination, setDestination] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "to"));
   const [filters, setFilters] = useState<Filters>(() => ({
-    broadcast: searchParams.get("broadcast") ?? "",
-    category: "",
+    broadcast: initialParams.get("broadcast") ?? "",
+    category: initialParams.get("category") ?? "",
+    priceBucket: initialParams.get("price") ?? "",
   }));
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +88,19 @@ function HomeContent() {
   const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [mapRestaurants, setMapRestaurants] = useState<RestaurantSummary[]>([]);
-  const [browseBroadcast, setBrowseBroadcast] = useState("");
+  const [browseBroadcast, setBrowseBroadcast] = useState(() => initialParams.get("broadcast") ?? "");
+  const [browsePriceBucket, setBrowsePriceBucket] = useState(() => initialParams.get("price") ?? "");
+  // geolocation 상태 — 권한 거부/미지원을 사용자에게 알려줘야 버튼이 먹통처럼 보이지 않는다.
+  const [geoStatus, setGeoStatus] = useState<"idle" | "locating" | "denied" | "unavailable">("idle");
+  // 검색 폼에 지금 들어 있는 값. 검색된 경로(origin/destination)와는 별개다 — 결과를
+  // 보는 중에 한쪽만 바꿔도 위쪽 요약은 그대로여야 한다.
+  const [formOrigin, setFormOrigin] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "from"));
+  const [formDestination, setFormDestination] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "to"));
+  // "저장한 곳 -> 출발지로"처럼 밖에서 폼 값을 넣을 때만 올린다. SearchForm의 key로
+  // 써서 새 초기값으로 다시 마운트시킨다 — 입력창의 표시 텍스트를 부모가 직접
+  // 밀어 넣으려면 타이핑 중인 값과 싸우게 되고, 그 동기화가 버그의 온상이다.
+  const [formSeedKey, setFormSeedKey] = useState(0);
+  const [isSavedViewOpen, setIsSavedViewOpen] = useState(false);
   // viewBounds: 실제로 데이터를 불러온 영역. pendingBounds: 지도가 지금 보여주고 있는 영역.
   // 이 둘이 달라지면(=사용자가 지도를 옮기면) "이 지역에서 다시 검색" 버튼을 보여주고,
   // 버튼을 눌러야 viewBounds가 갱신되어 그 영역 데이터를 불러온다 — 드래그할 때마다
@@ -73,8 +117,12 @@ function HomeContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [logoFailed, setLogoFailed] = useState(false);
+  const { favorites } = useFavorites();
   const searchSeqRef = useRef(0);
   const browseSeqRef = useRef(0);
+  // 지도를 프로그램이 옮긴 직후(내 위치로 이동 등)에는 "이 지역에서 다시 검색"을 또
+  // 누르게 하지 않고 그 영역을 바로 불러온다.
+  const autoLoadNextIdleRef = useRef(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
   const logoRef = useRef<HTMLImageElement>(null);
@@ -101,7 +149,13 @@ function HomeContent() {
   useEffect(() => {
     if (!viewBounds) return;
     const seq = ++browseSeqRef.current;
-    fetchAllRestaurants({ broadcast: browseBroadcast || undefined, bounds: viewBounds })
+    const bucket = findPriceBucket(browsePriceBucket);
+    fetchAllRestaurants({
+      broadcast: browseBroadcast || undefined,
+      minPrice: bucket?.minPrice,
+      maxPrice: bucket?.maxPrice,
+      bounds: viewBounds,
+    })
       .then((restaurants) => {
         if (seq !== browseSeqRef.current) return;
         setMapRestaurants(restaurants);
@@ -110,7 +164,33 @@ function HomeContent() {
         if (seq !== browseSeqRef.current) return;
         setMapRestaurants([]);
       });
-  }, [browseBroadcast, viewBounds]);
+  }, [browseBroadcast, browsePriceBucket, viewBounds]);
+
+  // 상태 -> URL 단방향 동기화. 검색한 경로와 필터가 주소에 남아야 새로고침해도
+  // 유지되고, 링크로 공유했을 때 상대가 같은 화면을 본다.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (origin) {
+      params.set("from", origin.label);
+      // 소수점 6자리면 약 11cm — 좌표를 그대로 넣으면 주소가 쓸데없이 길어진다.
+      params.set("from_lat", origin.lat.toFixed(6));
+      params.set("from_lng", origin.lng.toFixed(6));
+    }
+    if (destination) {
+      params.set("to", destination.label);
+      params.set("to_lat", destination.lat.toFixed(6));
+      params.set("to_lng", destination.lng.toFixed(6));
+    }
+    // 경로 모드와 브라우즈 모드는 각자 필터를 들고 있다 — 지금 보고 있는 쪽을 싣는다.
+    const broadcast = result ? filters.broadcast : browseBroadcast;
+    const priceBucket = result ? filters.priceBucket : browsePriceBucket;
+    if (broadcast) params.set("broadcast", broadcast);
+    if (result && filters.category) params.set("category", filters.category);
+    if (priceBucket) params.set("price", priceBucket);
+
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [origin, destination, filters, browseBroadcast, browsePriceBucket, result, router, pathname]);
 
   function roundedBoundsKey(bounds: MapBounds): string {
     return `${bounds.minLat.toFixed(4)},${bounds.maxLat.toFixed(4)},${bounds.minLng.toFixed(4)},${bounds.maxLng.toFixed(4)}`;
@@ -118,9 +198,34 @@ function HomeContent() {
 
   function handleBoundsIdle(bounds: MapBounds) {
     setPendingBounds(bounds);
+    if (autoLoadNextIdleRef.current) {
+      // 사용자가 드래그한 게 아니라 우리가 옮긴 것 — 그 동네를 바로 불러준다.
+      autoLoadNextIdleRef.current = false;
+      setViewBounds(bounds);
+      return;
+    }
     // 최초 idle에서만 곧바로 viewBounds를 채워 첫 화면 영역 기준으로 자동 로드한다 —
     // 그 이후로는 사용자가 "다시 검색" 버튼을 눌러야 viewBounds가 바뀐다.
     setViewBounds((current) => current ?? bounds);
+  }
+
+  function handleUseMyLocation() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoStatus("unavailable");
+      return;
+    }
+    setGeoStatus("locating");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGeoStatus("idle");
+        autoLoadNextIdleRef.current = true;
+        setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      () => setGeoStatus("denied"),
+      // 맛집을 찾는 데 미터 단위 정확도는 필요 없다 — 고정밀을 끄면 실내에서도
+      // 훨씬 빨리 잡히고 배터리도 덜 쓴다. 5분 이내 캐시는 그대로 재사용한다.
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
   }
 
   function handleRefreshArea() {
@@ -158,9 +263,28 @@ function HomeContent() {
     }
   }
 
+  // 출발지·목적지가 실린 링크로 들어왔으면 바로 검색해준다 — 공유받은 사람이
+  // 버튼을 한 번 더 누르지 않아도 같은 화면을 본다.
+  const didRestoreSearchRef = useRef(false);
+  useEffect(() => {
+    if (didRestoreSearchRef.current) return;
+    didRestoreSearchRef.current = true;
+    const from = placeFromParams(initialParams, "from");
+    const to = placeFromParams(initialParams, "to");
+    // runSearch가 곧바로 setIsLoading을 부르므로, effect 안에서 동기로 호출하면
+    // 마운트 렌더에 연쇄 렌더가 붙는다. 한 틱 미뤄 첫 페인트를 막지 않는다.
+    // (cleanup으로 취소하지 않는 건 의도적 — StrictMode의 이중 실행은 위 ref가
+    //  막아주는데, 여기서 clearTimeout까지 하면 개발 모드에서 검색이 아예 안 뜬다.)
+    if (from && to) setTimeout(() => runSearch(from, to), 0);
+    // 최초 1회만 — initialParams는 첫 렌더에 고정된 값이라 의존성이 바뀌지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace) {
     setOrigin(searchOrigin);
     setDestination(searchDestination);
+    setFormOrigin(searchOrigin);
+    setFormDestination(searchDestination);
     runSearch(searchOrigin, searchDestination);
   }
 
@@ -180,7 +304,7 @@ function HomeContent() {
     // 있으므로, 바로 다시 검색할 수 있다.
     setIsSearchCollapsed(false);
     // 경로용 방송/업종 필터는 브라우즈 모드에서 안 쓰이니 비운다 (지도 필터는 별도).
-    setFilters({ broadcast: "", category: "" });
+    setFilters({ broadcast: "", category: "", priceBucket: "" });
     // 경로를 따라 지도를 옮겨왔을 수 있어서, viewBounds가 지금 보이는 영역과 다르다.
     // 지금 영역으로 갱신해두면 "이 지역에서 다시 검색"을 한 번 더 누르지 않아도
     // 곧바로 그 동네 맛집이 찍힌다.
@@ -191,8 +315,26 @@ function HomeContent() {
     setFilters(newFilters);
   }
 
-  function handleOriginSelect(place: SelectedPlace) {
-    setMapCenter({ lat: place.lat, lng: place.lng });
+  function handleFormOriginChange(place: SelectedPlace | null) {
+    setFormOrigin(place);
+    if (place) setMapCenter({ lat: place.lat, lng: place.lng });
+  }
+
+  function seedForm(place: FavoritePlace, as: "origin" | "destination") {
+    const selected: SelectedPlace = { label: place.name, lat: place.latitude, lng: place.longitude };
+    if (as === "origin") setFormOrigin(selected);
+    else setFormDestination(selected);
+    setFormSeedKey((key) => key + 1);
+    setIsSavedViewOpen(false);
+    setIsSidebarCollapsed(false);
+    setIsSearchCollapsed(false);
+    setMapCenter({ lat: place.latitude, lng: place.longitude });
+  }
+
+  function handleShowFavoriteOnMap(place: FavoritePlace) {
+    setIsSavedViewOpen(false);
+    autoLoadNextIdleRef.current = true;
+    setMapCenter({ lat: place.latitude, lng: place.longitude });
   }
 
   function handleSelectRestaurant(id: string) {
@@ -254,8 +396,33 @@ function HomeContent() {
               전체 지도 보기
             </button>
           ) : (
-            <MapFilter value={browseBroadcast} onChange={setBrowseBroadcast} />
+            <MapFilter
+              value={browseBroadcast}
+              onChange={setBrowseBroadcast}
+              priceBucket={browsePriceBucket}
+              onPriceBucketChange={setBrowsePriceBucket}
+            />
           )}
+        </div>
+        {/* 내 주변 — 지도 좌측 하단. 우측 상단(필터/전체 지도 보기)과 중앙 상단
+            ("이 지역에서 다시 검색")이 이미 차 있어서 겹치지 않는 자리에 둔다. */}
+        <div className="pointer-events-none absolute bottom-6 right-6 z-10 flex flex-col items-end gap-2">
+          {geoStatus !== "idle" && geoStatus !== "locating" && (
+            <span className="pointer-events-auto rounded-lg bg-[#171310]/95 px-3 py-1.5 text-xs text-[#fca5a5] shadow-lg backdrop-blur-xl">
+              {geoStatus === "denied"
+                ? "위치 권한이 없어요 — 브라우저 설정에서 허용해주세요"
+                : "이 브라우저는 위치를 지원하지 않아요"}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleUseMyLocation}
+            disabled={geoStatus === "locating"}
+            className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/10 bg-[#171310]/95 px-3 py-2 text-sm font-medium text-[#fff7ed] shadow-xl shadow-black/30 backdrop-blur-xl transition hover:bg-[#29201a] disabled:cursor-not-allowed disabled:text-[#a89c91]"
+          >
+            <CrosshairIcon className="h-4 w-4 shrink-0 text-[#ffb45a]" />
+            {geoStatus === "locating" ? "위치 찾는 중" : "내 주변"}
+          </button>
         </div>
         {showRefreshArea && (
           <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 sm:top-24">
@@ -292,7 +459,19 @@ function HomeContent() {
             />
           )}
         </Link>
-        <nav className="pointer-events-auto flex items-center gap-4 text-sm text-[#a89c91] sm:gap-6">
+        <nav className="pointer-events-auto flex items-center gap-3 text-sm text-[#a89c91] sm:gap-4">
+          <button
+            type="button"
+            onClick={() => setIsSavedViewOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-sm font-medium text-[#fff7ed] transition hover:bg-white/10"
+          >
+            저장한 곳
+            {favorites.length > 0 && (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#ff7a1a] px-1 text-xs font-bold text-[#171310]">
+                {favorites.length}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             onClick={() => setIsListViewOpen(true)}
@@ -305,6 +484,16 @@ function HomeContent() {
 
       {isListViewOpen && (
         <RestaurantListView onClose={() => setIsListViewOpen(false)} topOffset={headerHeight} />
+      )}
+
+      {isSavedViewOpen && (
+        <SavedPlacesView
+          onClose={() => setIsSavedViewOpen(false)}
+          topOffset={headerHeight}
+          onShowOnMap={handleShowFavoriteOnMap}
+          onSetAsOrigin={(place) => seedForm(place, "origin")}
+          onSetAsDestination={(place) => seedForm(place, "destination")}
+        />
       )}
 
       {/* 사이드바 접기/펼치기 손잡이 — 데스크톱 전용. 화면 세로 중앙에 혼자 떠 있으면
@@ -377,7 +566,15 @@ function HomeContent() {
                       : "경로 근처에서 방송 맛집을 찾지 못했어요"}
                 </p>
               </div>
-              <SearchForm onOriginSelect={handleOriginSelect} onSearch={handleSearch} isLoading={isLoading} />
+              <SearchForm
+                key={formSeedKey}
+                onOriginChange={handleFormOriginChange}
+                onDestinationChange={setFormDestination}
+                onSearch={handleSearch}
+                isLoading={isLoading}
+                initialOrigin={formOrigin}
+                initialDestination={formDestination}
+              />
             </div>
             {isJourneyReady && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
           </div>

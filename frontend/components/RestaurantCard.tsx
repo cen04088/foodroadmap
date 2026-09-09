@@ -4,6 +4,20 @@ import { formatDistance, formatDuration } from "../lib/format";
 import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getRestaurantThumbnailUrl } from "../lib/thumbnail";
+import { useFavorites } from "../lib/favorites";
+
+function BookmarkIcon({ filled, className }: { filled: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill={filled ? "currentColor" : "none"} className={className} aria-hidden="true">
+      <path
+        d="M5 3.5h10a1 1 0 0 1 1 1v12l-6-3.5-6 3.5v-12a1 1 0 0 1 1-1z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export interface RestaurantCardProps {
   restaurant: RestaurantSummary & { distance_from_route_km?: number; cumulative_time_sec?: number };
@@ -29,6 +43,8 @@ export default function RestaurantCard({
   const thumbnailUrl = getRestaurantThumbnailUrl(restaurant);
   const primaryBroadcast = restaurant.broadcasts[0] ?? null;
   const { color: programColor, letter: programLetter } = getBroadcastColor(primaryBroadcast ?? "");
+  const { favorites, toggle } = useFavorites();
+  const isSaved = favorites.some((f) => f.id === restaurant.id);
 
   return (
     <div
@@ -66,6 +82,21 @@ export default function RestaurantCard({
                 {restaurant.category}
               </span>
             )}
+            <button
+              type="button"
+              // 카드 전체가 클릭 가능해서, 저장 버튼이 카드 선택까지 같이 트리거하면 안 된다.
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(restaurant);
+              }}
+              aria-pressed={isSaved}
+              aria-label={isSaved ? `${restaurant.name} 저장 취소` : `${restaurant.name} 저장`}
+              className={`-mr-1 -mt-1 shrink-0 rounded-full p-1 transition ${
+                isSaved ? "text-accent" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <BookmarkIcon filled={isSaved} className="h-4 w-4" />
+            </button>
           </div>
 
           {hasRouteInfo && (
