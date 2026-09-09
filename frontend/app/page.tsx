@@ -506,16 +506,16 @@ function HomeContent() {
         onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
         aria-expanded={!isSidebarCollapsed}
         aria-label={isSidebarCollapsed ? "검색 패널 펼치기" : "검색 패널 접기"}
-        className={`hidden sm:absolute sm:left-[calc(1.5rem+var(--sidebar-w))] sm:top-24 sm:z-10 sm:flex sm:h-12 sm:w-7 sm:items-center sm:justify-center sm:rounded-r-xl sm:border sm:border-l-0 sm:border-white/10 sm:bg-[#171310]/95 sm:text-[#a89c91] sm:shadow-xl sm:shadow-black/30 sm:backdrop-blur-xl sm:transition sm:duration-300 sm:hover:text-[#fff7ed] sm:short:top-[84px] ${
-          isSidebarCollapsed ? "sm:-translate-x-[calc(1.5rem+var(--sidebar-w))]" : ""
+        className={`hidden sm:absolute sm:left-[calc(var(--sidebar-gap)+var(--sidebar-w))] sm:top-24 sm:z-10 sm:flex sm:h-12 sm:w-7 sm:items-center sm:justify-center sm:rounded-r-xl sm:border sm:border-l-0 sm:border-white/10 sm:bg-[#171310]/95 sm:text-[#a89c91] sm:shadow-xl sm:shadow-black/30 sm:backdrop-blur-xl sm:transition sm:duration-300 sm:hover:text-[#fff7ed] sm:short:top-[84px] ${
+          isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-gap)+var(--sidebar-w))]" : ""
         }`}
       >
         <Chevron className={`h-4 w-4 ${isSidebarCollapsed ? "-rotate-90" : "rotate-90"}`} />
       </button>
 
       <div
-        className={`contents sm:pointer-events-none sm:absolute sm:bottom-6 sm:left-6 sm:top-20 sm:z-10 sm:flex sm:w-[var(--sidebar-w)] sm:flex-col sm:gap-3 sm:transition-transform sm:duration-300 sm:short:bottom-3 sm:short:top-[68px] sm:short:gap-2 ${
-          isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-w)+1.5rem)]" : ""
+        className={`contents sm:pointer-events-none sm:absolute sm:bottom-[var(--sidebar-gap)] sm:left-[var(--sidebar-gap)] sm:top-20 sm:z-10 sm:flex sm:w-[var(--sidebar-w)] sm:flex-col sm:gap-3 sm:transition-transform sm:duration-300 sm:short:top-[68px] sm:short:gap-2 ${
+          isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-w)+var(--sidebar-gap))]" : ""
         }`}
       >
         <div className="relative z-20 order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
