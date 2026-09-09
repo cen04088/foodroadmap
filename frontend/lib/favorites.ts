@@ -66,6 +66,21 @@ function writeFavorites(favorites: FavoritePlace[]): void {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
+export function isFavorite(id: string): boolean {
+  return readFavorites().some((f) => f.id === id);
+}
+
+export function toggleFavorite(restaurant: RestaurantSummary): boolean {
+  const current = readFavorites();
+  const wasSaved = current.some((f) => f.id === restaurant.id);
+  writeFavorites(
+    wasSaved
+      ? current.filter((f) => f.id !== restaurant.id)
+      : [toFavorite(restaurant), ...current]
+  );
+  return !wasSaved;
+}
+
 export function useFavorites() {
   // 서버 렌더에는 localStorage가 없다. 빈 배열로 시작해 마운트 후 읽어야
   // 하이드레이션 불일치가 나지 않는다.
@@ -83,11 +98,7 @@ export function useFavorites() {
   }, []);
 
   const toggle = useCallback((restaurant: RestaurantSummary) => {
-    const current = readFavorites();
-    const existing = current.some((f) => f.id === restaurant.id);
-    writeFavorites(
-      existing ? current.filter((f) => f.id !== restaurant.id) : [toFavorite(restaurant), ...current]
-    );
+    toggleFavorite(restaurant);
   }, []);
 
   const remove = useCallback((id: string) => {

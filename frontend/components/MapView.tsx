@@ -2,6 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
+import { isFavorite, toggleFavorite } from "../lib/favorites";
+
+const SAVED_COLOR = "#ff7a1a";
+const UNSAVED_COLOR = "#a8a29e";
+
+// 말풍선은 문자열로 만들어 넣으므로 아이콘도 문자열로 그린다. filled 여부만 다르다.
+function bookmarkSvg(saved: boolean): string {
+  return `<svg viewBox="0 0 20 20" fill="${saved ? "currentColor" : "none"}" style="width:16px;height:16px;display:block;" aria-hidden="true"><path d="M5 3.5h10a1 1 0 0 1 1 1v12l-6-3.5-6 3.5v-12a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+}
 import type { MapBounds, RestaurantResult, RestaurantSummary, RoutePoint } from "../lib/api";
 import { formatDuration } from "../lib/format";
 import { getBroadcastColor } from "../lib/broadcastColors";
@@ -88,6 +97,9 @@ export default function MapView({
   const onMarkerClickRef = useRef(onMarkerClick);
   const onShowDetailRef = useRef(onShowDetail);
   const onBoundsIdleRef = useRef(onBoundsIdle);
+  // 전역 저장 핸들러가 id로 가게를 되찾아야 하는데, 그 핸들러는 마운트 시 한 번만
+  // 등록되므로 최신 목록을 ref로 따라가게 한다.
+  const restaurantsRef = useRef(restaurants);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
@@ -106,8 +118,12 @@ export default function MapView({
     onBoundsIdleRef.current = onBoundsIdle;
   }, [onBoundsIdle]);
 
+  useEffect(() => {
+    restaurantsRef.current = restaurants;
+  }, [restaurants]);
+
   // 카카오 오버레이는 순수 HTML 문자열이라 React 이벤트 핸들러를 못 붙인다 —
-  // 말풍선 안 버튼들("자세히 보기", 닫기)의 onclick에서 호출할 전역 함수를 등록해둔다.
+  // 말풍선 안 버튼들("자세히 보기", 저장, 닫기)의 onclick에서 호출할 전역 함수를 등록해둔다.
   useEffect(() => {
     (window as any).__foodmapShowDetail = (id: string) => {
       onShowDetailRef.current?.(id);
@@ -116,9 +132,22 @@ export default function MapView({
       infoWindowRef.current?.setMap(null);
       infoWindowRef.current = null;
     };
+    (window as any).__foodmapToggleFavorite = (id: string) => {
+      const restaurant = restaurantsRef.current.find((r) => r.id === id);
+      if (!restaurant) return;
+      const saved = toggleFavorite(restaurant);
+      // React가 관리하지 않는 DOM이라 상태 변화를 직접 반영해야 한다.
+      const button = document.querySelector<HTMLElement>(`[data-foodmap-fav="${id}"]`);
+      if (button) {
+        button.style.color = saved ? SAVED_COLOR : UNSAVED_COLOR;
+        button.setAttribute("aria-pressed", String(saved));
+        button.innerHTML = bookmarkSvg(saved);
+      }
+    };
     return () => {
       delete (window as any).__foodmapShowDetail;
       delete (window as any).__foodmapCloseOverlay;
+      delete (window as any).__foodmapToggleFavorite;
     };
   }, []);
 
@@ -258,6 +287,9 @@ export default function MapView({
           : "";
         // 인라인 스타일로는 :hover를 못 만들어서 onmouseover/onmouseout으로 색만 바꾼다.
         const closeButton = `<button type="button" aria-label="닫기" onclick="window.__foodmapCloseOverlay && window.__foodmapCloseOverlay()" onmouseover="this.style.color='#1c1917'" onmouseout="this.style.color='#a8a29e'" style="position:absolute;top:4px;right:4px;display:flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:0;background:transparent;color:#a8a29e;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:15px;line-height:1;cursor:pointer;">✕</button>`;
+        // 저장 여부는 여기서 새로 읽는다 — 다른 화면(카드/상세)에서 바꿨을 수도 있다.
+        const saved = isFavorite(restaurant.id);
+        const favoriteButton = `<button type="button" data-foodmap-fav="${restaurant.id}" aria-pressed="${saved}" aria-label="저장" onclick="window.__foodmapToggleFavorite && window.__foodmapToggleFavorite('${restaurant.id}')" style="position:absolute;top:4px;right:26px;display:flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:0;background:transparent;color:${saved ? SAVED_COLOR : UNSAVED_COLOR};cursor:pointer;">${bookmarkSvg(saved)}</button>`;
         const detailButton = `<button type="button" onclick="window.__foodmapShowDetail && window.__foodmapShowDetail('${restaurant.id}')" style="margin-top:6px;padding:4px 10px;border-radius:9999px;border:1px solid #ff7a1a;background:transparent;color:#ff7a1a;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">자세히 보기</button>`;
         // 카카오 InfoWindow는 자체 말풍선 배경(스킨)을 콘텐츠와 별도로 측정해서
         // 그리는데, 폰트 로딩 타이밍에 따라 실제 콘텐츠 높이와 어긋나 텍스트가
@@ -269,7 +301,8 @@ export default function MapView({
           yAnchor: 1.25,
           content: `<div style="position:relative;box-sizing:border-box;width:210px;padding:10px 12px;background:#ffffff;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.2);font-family:'Pretendard Variable',Pretendard,sans-serif;overflow-wrap:break-word;word-break:break-word;">
             ${closeButton}
-            <div style="padding-right:20px;font-size:12px;font-weight:700;">${topLine}</div>
+            ${favoriteButton}
+            <div style="padding-right:44px;font-size:12px;font-weight:700;">${topLine}</div>
             <div style="margin-top:3px;font-size:14px;font-weight:700;color:#1c1917;line-height:1.35;">${escapeHtml(restaurant.name)}</div>
             ${bottomLine ? `<div style="margin-top:3px;font-size:12px;color:#78716c;">${bottomLine}</div>` : ""}
             ${detailButton}

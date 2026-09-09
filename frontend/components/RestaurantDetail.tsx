@@ -6,7 +6,21 @@ import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getBroadcastImage } from "../lib/broadcastImages";
 import { getYoutubeVideoId } from "../lib/youtube";
+import { useFavorites } from "../lib/favorites";
 import YoutubeModal from "./YoutubeModal";
+
+function BookmarkIcon({ filled, className }: { filled: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill={filled ? "currentColor" : "none"} className={className} aria-hidden="true">
+      <path
+        d="M5 3.5h10a1 1 0 0 1 1 1v12l-6-3.5-6 3.5v-12a1 1 0 0 1 1-1z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export interface RestaurantDetailProps {
   restaurant: RestaurantSummary & { distance_from_route_km?: number; cumulative_time_sec?: number };
@@ -95,17 +109,32 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
   }
 
   const kakaoMapUrl = `https://map.kakao.com/link/to/${encodeURIComponent(restaurant.name)},${restaurant.latitude},${restaurant.longitude}`;
+  const { favorites, toggle } = useFavorites();
+  const isSaved = favorites.some((f) => f.id === restaurant.id);
 
   return (
     <div className="flex h-full flex-col">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex w-fit items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm text-ink-muted transition hover:text-ink"
-      >
-        <BackIcon />
-        목록으로
-      </button>
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex w-fit items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm text-ink-muted transition hover:text-ink"
+        >
+          <BackIcon />
+          목록으로
+        </button>
+        <button
+          type="button"
+          onClick={() => toggle(restaurant)}
+          aria-pressed={isSaved}
+          className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-sm transition ${
+            isSaved ? "text-accent" : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          <BookmarkIcon filled={isSaved} className="h-4 w-4" />
+          {isSaved ? "저장됨" : "저장"}
+        </button>
+      </div>
 
       <div className="no-scrollbar mt-2 flex-1 overflow-y-auto pb-1">
         {videoId ? (
