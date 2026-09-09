@@ -48,7 +48,7 @@ def _top_menu_items(restaurant: Restaurant, limit: int = MENU_DISPLAY_LIMIT) -> 
 
 def _reference_price_won(restaurant: Restaurant) -> int | None:
     """가격 필터가 기준으로 삼는 "이 집 한 끼 값" — repository._reference_price_column과
-    같은 규칙(대표 메뉴 최저가, 없으면 전체 최저가)을 응답에도 실어준다.
+    같은 규칙(가격이 있는 메뉴를 대표 우선·목록 순으로 세운 첫 번째)을 응답에도 실어준다.
 
     경로 검색 결과는 필터를 바꿀 때마다 재검색하지 않고 클라이언트에서 걸러내는데,
     menu는 상위 3개만 내려가므로 클라이언트가 이 값을 스스로 계산할 수 없다.
@@ -56,8 +56,8 @@ def _reference_price_won(restaurant: Restaurant) -> int | None:
     priced = [m for m in restaurant.menu_items if m.price_won is not None]
     if not priced:
         return None
-    representative = [m for m in priced if m.is_representative]
-    return min(m.price_won for m in (representative or priced))
+    # _top_menu_items와 같은 정렬 키 — 카드에 첫 줄로 보이는 메뉴의 가격이 된다.
+    return min(priced, key=lambda m: (not m.is_representative, m.position)).price_won
 
 
 def _serialize_match(match: RestaurantMatch) -> dict:

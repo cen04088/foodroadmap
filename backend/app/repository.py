@@ -7,25 +7,21 @@ from app.models import Broadcast, MenuItem, Restaurant, restaurant_broadcasts
 def _reference_price_column():
     """가격 필터의 기준이 되는 "이 집 한 끼 값".
 
-    최저가 메뉴를 쓰면 공기밥·음료 때문에 거의 모든 가게가 최저 구간에 걸려 필터가
-    무의미해진다. 그래서 가게가 직접 "대표"로 표시한 메뉴의 최저가를 먼저 보고,
-    대표 표시가 없는 가게만 전체 메뉴 최저가로 폴백한다.
+    가격이 적힌 메뉴를 (대표 우선, 사이트 목록 순)으로 줄 세운 첫 번째의 가격 —
+    routes._top_menu_items가 카드에 메뉴를 보여줄 때 쓰는 정렬과 같다. 그래서
+    "1만원 이하로 걸렀는데 카드 첫 줄은 25,000원" 같은 어긋남이 생기지 않는다.
+
+    최저가를 쓰면 공기밥·음료 때문에 거의 모든 가게가 최저 구간에 걸려 필터가
+    무의미해진다. 목록 순서를 믿는 건 가게가 주력 메뉴를 앞에 놓는다는 전제인데,
+    parser.py가 대표 표시를 추측하지 않고 그대로 가져오는 것과 같은 판단이다.
     """
-    representative = (
-        select(func.min(MenuItem.price_won))
-        .where(
-            MenuItem.restaurant_id == Restaurant.id,
-            MenuItem.is_representative.is_(True),
-            MenuItem.price_won.is_not(None),
-        )
-        .scalar_subquery()
-    )
-    any_menu = (
-        select(func.min(MenuItem.price_won))
+    return (
+        select(MenuItem.price_won)
         .where(MenuItem.restaurant_id == Restaurant.id, MenuItem.price_won.is_not(None))
+        .order_by(MenuItem.is_representative.desc(), MenuItem.position)
+        .limit(1)
         .scalar_subquery()
     )
-    return func.coalesce(representative, any_menu)
 
 
 def _apply_price_filter(stmt, min_price: int | None, max_price: int | None):
