@@ -21,7 +21,6 @@ import {
 } from "../lib/api";
 import { formatDuration } from "../lib/format";
 import { useFavorites, type FavoritePlace } from "../lib/favorites";
-import { findPriceBucket } from "../lib/priceBuckets";
 import { matchesFilters } from "../lib/restaurantFilter";
 
 function errorMessageFor(error: unknown): string {
@@ -78,7 +77,6 @@ function HomeContent() {
   const [filters, setFilters] = useState<Filters>(() => ({
     broadcast: initialParams.get("broadcast") ?? "",
     category: initialParams.get("category") ?? "",
-    priceBucket: initialParams.get("price") ?? "",
   }));
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,7 +87,6 @@ function HomeContent() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [mapRestaurants, setMapRestaurants] = useState<RestaurantSummary[]>([]);
   const [browseBroadcast, setBrowseBroadcast] = useState(() => initialParams.get("broadcast") ?? "");
-  const [browsePriceBucket, setBrowsePriceBucket] = useState(() => initialParams.get("price") ?? "");
   // geolocation 상태 — 권한 거부/미지원을 사용자에게 알려줘야 버튼이 먹통처럼 보이지 않는다.
   const [geoStatus, setGeoStatus] = useState<"idle" | "locating" | "denied" | "unavailable">("idle");
   // 검색 폼에 지금 들어 있는 값. 검색된 경로(origin/destination)와는 별개다 — 결과를
@@ -149,13 +146,7 @@ function HomeContent() {
   useEffect(() => {
     if (!viewBounds) return;
     const seq = ++browseSeqRef.current;
-    const bucket = findPriceBucket(browsePriceBucket);
-    fetchAllRestaurants({
-      broadcast: browseBroadcast || undefined,
-      minPrice: bucket?.minPrice,
-      maxPrice: bucket?.maxPrice,
-      bounds: viewBounds,
-    })
+    fetchAllRestaurants({ broadcast: browseBroadcast || undefined, bounds: viewBounds })
       .then((restaurants) => {
         if (seq !== browseSeqRef.current) return;
         setMapRestaurants(restaurants);
@@ -164,7 +155,7 @@ function HomeContent() {
         if (seq !== browseSeqRef.current) return;
         setMapRestaurants([]);
       });
-  }, [browseBroadcast, browsePriceBucket, viewBounds]);
+  }, [browseBroadcast, viewBounds]);
 
   // 상태 -> URL 단방향 동기화. 검색한 경로와 필터가 주소에 남아야 새로고침해도
   // 유지되고, 링크로 공유했을 때 상대가 같은 화면을 본다.
@@ -183,14 +174,12 @@ function HomeContent() {
     }
     // 경로 모드와 브라우즈 모드는 각자 필터를 들고 있다 — 지금 보고 있는 쪽을 싣는다.
     const broadcast = result ? filters.broadcast : browseBroadcast;
-    const priceBucket = result ? filters.priceBucket : browsePriceBucket;
     if (broadcast) params.set("broadcast", broadcast);
     if (result && filters.category) params.set("category", filters.category);
-    if (priceBucket) params.set("price", priceBucket);
 
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [origin, destination, filters, browseBroadcast, browsePriceBucket, result, router, pathname]);
+  }, [origin, destination, filters, browseBroadcast, result, router, pathname]);
 
   function roundedBoundsKey(bounds: MapBounds): string {
     return `${bounds.minLat.toFixed(4)},${bounds.maxLat.toFixed(4)},${bounds.minLng.toFixed(4)},${bounds.maxLng.toFixed(4)}`;
@@ -304,7 +293,7 @@ function HomeContent() {
     // 있으므로, 바로 다시 검색할 수 있다.
     setIsSearchCollapsed(false);
     // 경로용 방송/업종 필터는 브라우즈 모드에서 안 쓰이니 비운다 (지도 필터는 별도).
-    setFilters({ broadcast: "", category: "", priceBucket: "" });
+    setFilters({ broadcast: "", category: "" });
     // 경로를 따라 지도를 옮겨왔을 수 있어서, viewBounds가 지금 보이는 영역과 다르다.
     // 지금 영역으로 갱신해두면 "이 지역에서 다시 검색"을 한 번 더 누르지 않아도
     // 곧바로 그 동네 맛집이 찍힌다.
@@ -396,12 +385,7 @@ function HomeContent() {
               전체 지도 보기
             </button>
           ) : (
-            <MapFilter
-              value={browseBroadcast}
-              onChange={setBrowseBroadcast}
-              priceBucket={browsePriceBucket}
-              onPriceBucketChange={setBrowsePriceBucket}
-            />
+            <MapFilter value={browseBroadcast} onChange={setBrowseBroadcast} />
           )}
         </div>
         {/* 내 주변 — 지도 좌측 하단. 우측 상단(필터/전체 지도 보기)과 중앙 상단

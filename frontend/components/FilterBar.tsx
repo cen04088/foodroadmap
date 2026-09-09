@@ -1,12 +1,10 @@
 "use client";
 
 import BroadcastDropdown from "./BroadcastDropdown";
-import { PRICE_BUCKETS } from "../lib/priceBuckets";
 
 export interface Filters {
   broadcast: string;
   category: string;
-  priceBucket: string;
 }
 
 export const BROADCASTS: { value: string; label: string }[] = [
@@ -33,8 +31,7 @@ export interface FilterBarProps {
 
 export default function FilterBar({ filters, onChange }: FilterBarProps) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-2 sm:flex-row">
+    <div className="flex flex-col gap-2 sm:flex-row">
       <div className="flex-1 sm:max-w-[220px]">
         <BroadcastDropdown
           value={filters.broadcast}
@@ -50,39 +47,6 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
         placeholder="업종 (예: 한식, 일식)"
         className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted outline-none transition focus:border-accent focus:ring-4 focus:ring-accent-soft sm:max-w-[220px]"
       />
-      </div>
-      <PriceBucketPills
-        value={filters.priceBucket}
-        onChange={(priceBucket) => onChange({ ...filters, priceBucket })}
-      />
-    </div>
-  );
-}
-
-export function PriceBucketPills({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {PRICE_BUCKETS.map((bucket) => (
-        <button
-          key={bucket.value || "all"}
-          type="button"
-          onClick={() => onChange(bucket.value)}
-          aria-pressed={value === bucket.value}
-          className={`rounded-full px-3 py-1.5 text-xs transition ${
-            value === bucket.value
-              ? "bg-accent font-semibold text-[#171310]"
-              : "bg-white/5 text-ink-muted hover:bg-white/10"
-          }`}
-        >
-          {bucket.label}
-        </button>
-      ))}
     </div>
   );
 }

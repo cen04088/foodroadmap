@@ -1,41 +1,7 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Broadcast, MenuItem, Restaurant, restaurant_broadcasts
-
-
-def _reference_price_column():
-    """가격 필터의 기준이 되는 "이 집 한 끼 값".
-
-    가격이 적힌 메뉴를 (대표 우선, 사이트 목록 순)으로 줄 세운 첫 번째의 가격 —
-    routes._top_menu_items가 카드에 메뉴를 보여줄 때 쓰는 정렬과 같다. 그래서
-    "1만원 이하로 걸렀는데 카드 첫 줄은 25,000원" 같은 어긋남이 생기지 않는다.
-
-    최저가를 쓰면 공기밥·음료 때문에 거의 모든 가게가 최저 구간에 걸려 필터가
-    무의미해진다. 목록 순서를 믿는 건 가게가 주력 메뉴를 앞에 놓는다는 전제인데,
-    parser.py가 대표 표시를 추측하지 않고 그대로 가져오는 것과 같은 판단이다.
-    """
-    return (
-        select(MenuItem.price_won)
-        .where(MenuItem.restaurant_id == Restaurant.id, MenuItem.price_won.is_not(None))
-        .order_by(MenuItem.is_representative.desc(), MenuItem.position)
-        .limit(1)
-        .scalar_subquery()
-    )
-
-
-def _apply_price_filter(stmt, min_price: int | None, max_price: int | None):
-    # 가격을 지정하지 않았으면 메뉴 가격이 없는 가게도 그대로 남긴다 — 필터를 걸었을
-    # 때만 "가격을 아는 가게" 중에서 고른다.
-    if min_price is None and max_price is None:
-        return stmt
-    price = _reference_price_column()
-    stmt = stmt.where(price.is_not(None))
-    if min_price is not None:
-        stmt = stmt.where(price >= min_price)
-    if max_price is not None:
-        stmt = stmt.where(price <= max_price)
-    return stmt
+from app.models import Broadcast, Restaurant, restaurant_broadcasts
 
 
 def query_candidate_restaurants(
@@ -47,8 +13,6 @@ def query_candidate_restaurants(
     *,
     broadcast_slug: str | None = None,
     category: str | None = None,
-    min_price: int | None = None,
-    max_price: int | None = None,
 ) -> list[Restaurant]:
     stmt = select(Restaurant).options(
         selectinload(Restaurant.broadcasts), selectinload(Restaurant.menu_items)
@@ -58,8 +22,6 @@ def query_candidate_restaurants(
         Restaurant.latitude.between(min_lat, max_lat),
         Restaurant.longitude.between(min_lng, max_lng),
     )
-
-    stmt = _apply_price_filter(stmt, min_price, max_price)
 
     if category:
         stmt = stmt.where(Restaurant.category == category)
@@ -78,8 +40,6 @@ def list_all_restaurants(
     broadcast_slug: str | None = None,
     category: str | None = None,
     bbox: tuple[float, float, float, float] | None = None,
-    min_price: int | None = None,
-    max_price: int | None = None,
 ) -> list[Restaurant]:
     stmt = select(Restaurant).options(
         selectinload(Restaurant.broadcasts), selectinload(Restaurant.menu_items)
@@ -94,8 +54,6 @@ def list_all_restaurants(
             Restaurant.latitude.between(min_lat, max_lat),
             Restaurant.longitude.between(min_lng, max_lng),
         )
-
-    stmt = _apply_price_filter(stmt, min_price, max_price)
 
     if category:
         stmt = stmt.where(Restaurant.category == category)

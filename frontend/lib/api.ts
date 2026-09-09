@@ -23,9 +23,6 @@ export interface RestaurantSummary {
   youtube_url: string | null;
   broadcasts: string[];
   menu: MenuItemSummary[];
-  // 대표 메뉴 최저가(없으면 전체 메뉴 최저가). 가격 필터의 기준값을 서버가 계산해
-  // 내려준다 — menu는 상위 3개만 오므로 클라이언트가 같은 값을 구할 수 없다.
-  reference_price_won: number | null;
 }
 
 export interface RestaurantResult extends RestaurantSummary {
@@ -59,8 +56,6 @@ export interface FetchRouteRestaurantsParams {
   destinationLng: number;
   broadcast?: string;
   category?: string;
-  minPrice?: number;
-  maxPrice?: number;
   radiusKm?: number;
 }
 
@@ -95,8 +90,6 @@ export async function fetchRouteRestaurants(
   });
   if (params.broadcast) query.set("broadcast", params.broadcast);
   if (params.category) query.set("category", params.category);
-  if (params.minPrice !== undefined) query.set("min_price", String(params.minPrice));
-  if (params.maxPrice !== undefined) query.set("max_price", String(params.maxPrice));
   // 반경은 프론트에서 안 보내고 백엔드 기본값(2km)에 맡긴다 — 사용자가 고르는 UI를
   // 없앴으므로 기본값을 양쪽에 중복해두지 않는다. 파라미터 자체는 남겨둔다.
   if (params.radiusKm) query.set("radius_km", String(params.radiusKm));
@@ -121,8 +114,6 @@ export interface MapBounds {
 export interface FetchAllRestaurantsParams {
   broadcast?: string;
   category?: string;
-  minPrice?: number;
-  maxPrice?: number;
   bounds?: MapBounds;
 }
 
@@ -133,8 +124,6 @@ export async function fetchAllRestaurants(
   const query = new URLSearchParams();
   if (params.broadcast) query.set("broadcast", params.broadcast);
   if (params.category) query.set("category", params.category);
-  if (params.minPrice !== undefined) query.set("min_price", String(params.minPrice));
-  if (params.maxPrice !== undefined) query.set("max_price", String(params.maxPrice));
   if (params.bounds) {
     query.set("min_lat", String(params.bounds.minLat));
     query.set("max_lat", String(params.bounds.maxLat));

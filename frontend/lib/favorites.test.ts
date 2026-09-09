@@ -19,7 +19,6 @@ const restaurant: RestaurantSummary = {
   youtube_url: null,
   broadcasts: ["또간집"],
   menu: [],
-  reference_price_won: 9000,
 };
 
 describe("readFavorites", () => {

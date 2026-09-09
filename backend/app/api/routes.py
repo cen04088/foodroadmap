@@ -46,20 +46,6 @@ def _top_menu_items(restaurant: Restaurant, limit: int = MENU_DISPLAY_LIMIT) -> 
     ]
 
 
-def _reference_price_won(restaurant: Restaurant) -> int | None:
-    """가격 필터가 기준으로 삼는 "이 집 한 끼 값" — repository._reference_price_column과
-    같은 규칙(가격이 있는 메뉴를 대표 우선·목록 순으로 세운 첫 번째)을 응답에도 실어준다.
-
-    경로 검색 결과는 필터를 바꿀 때마다 재검색하지 않고 클라이언트에서 걸러내는데,
-    menu는 상위 3개만 내려가므로 클라이언트가 이 값을 스스로 계산할 수 없다.
-    """
-    priced = [m for m in restaurant.menu_items if m.price_won is not None]
-    if not priced:
-        return None
-    # _top_menu_items와 같은 정렬 키 — 카드에 첫 줄로 보이는 메뉴의 가격이 된다.
-    return min(priced, key=lambda m: (not m.is_representative, m.position)).price_won
-
-
 def _serialize_match(match: RestaurantMatch) -> dict:
     restaurant = match.restaurant
     return {
@@ -76,7 +62,6 @@ def _serialize_match(match: RestaurantMatch) -> dict:
         "cumulative_time_sec": round(match.cumulative_time_sec),
         "broadcasts": [b.name for b in restaurant.broadcasts],
         "menu": _top_menu_items(restaurant),
-        "reference_price_won": _reference_price_won(restaurant),
     }
 
 
@@ -93,7 +78,6 @@ def _serialize_restaurant(restaurant: Restaurant) -> dict:
         "youtube_url": restaurant.youtube_url,
         "broadcasts": [b.name for b in restaurant.broadcasts],
         "menu": _top_menu_items(restaurant),
-        "reference_price_won": _reference_price_won(restaurant),
     }
 
 
@@ -108,8 +92,6 @@ def get_restaurants(
     response: Response,
     broadcast: str | None = Query(None),
     category: str | None = Query(None),
-    min_price: int | None = Query(None, ge=0),
-    max_price: int | None = Query(None, ge=0),
     min_lat: float | None = Query(None),
     max_lat: float | None = Query(None),
     min_lng: float | None = Query(None),
@@ -120,14 +102,7 @@ def get_restaurants(
     bbox = None
     if None not in (min_lat, max_lat, min_lng, max_lng):
         bbox = (min_lat, max_lat, min_lng, max_lng)
-    restaurants = list_all_restaurants(
-        session,
-        broadcast_slug=broadcast,
-        category=category,
-        bbox=bbox,
-        min_price=min_price,
-        max_price=max_price,
-    )
+    restaurants = list_all_restaurants(session, broadcast_slug=broadcast, category=category, bbox=bbox)
     return {"restaurants": [_serialize_restaurant(r) for r in restaurants]}
 
 
@@ -138,8 +113,6 @@ def get_route_restaurants(
     radius_km: float = Query(DEFAULT_RADIUS_KM, gt=0, le=50),
     broadcast: str | None = Query(None),
     category: str | None = Query(None),
-    min_price: int | None = Query(None, ge=0),
-    max_price: int | None = Query(None, ge=0),
     session: Session = Depends(get_session),
 ):
     origin_lat, origin_lng = _parse_lat_lng(origin)
@@ -169,15 +142,7 @@ def get_route_restaurants(
 
     min_lat, max_lat, min_lng, max_lng = bounding_box_with_margin(route_points, radius_km)
     candidates = query_candidate_restaurants(
-        session,
-        min_lat,
-        max_lat,
-        min_lng,
-        max_lng,
-        broadcast_slug=broadcast,
-        category=category,
-        min_price=min_price,
-        max_price=max_price,
+        session, min_lat, max_lat, min_lng, max_lng, broadcast_slug=broadcast, category=category
     )
     matching_points = downsample_route_points(route_points, MAX_ROUTE_POINTS_FOR_MATCHING)
     matches = match_restaurants_to_route(matching_points, candidates, radius_km)
