@@ -102,6 +102,37 @@ function HomeContent() {
   const autoLoadNextIdleRef = useRef(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  // 목록 패널의 스크롤 컨테이너(데스크톱). 모바일에서는 패널이 아니라 페이지가 스크롤된다.
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  // 목록을 한참 내린 뒤 AI 플래너(맨 위)로 돌아가는 데 시간이 걸려서 "맨 위로" 버튼을 띄운다.
+  const [isListScrolledDown, setIsListScrolledDown] = useState(false);
+
+  useEffect(() => {
+    const container = listScrollRef.current;
+    const update = () => {
+      // 모바일은 목록 시작점 기준으로 잰다 — 페이지 맨 위 기준이면 목록 첫머리(AI 플래너)로
+      // 돌아온 뒤에도 검색 카드·지도 높이만큼 스크롤이 남아 버튼이 계속 떠 있게 된다.
+      const listTop = container ? container.getBoundingClientRect().top + window.scrollY : 0;
+      setIsListScrolledDown((container?.scrollTop ?? 0) > 240 || window.scrollY > listTop + 240);
+    };
+    update();
+    container?.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("scroll", update, { passive: true });
+    return () => {
+      container?.removeEventListener("scroll", update);
+      window.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  function scrollListToTop() {
+    const container = listScrollRef.current;
+    if (!container) return;
+    // 데스크톱: 패널 안 스크롤을 되돌린다. 모바일: 페이지를 목록 시작 위치로 올린다 —
+    // 페이지 맨 위(검색 카드·지도)까지 가면 AI 플래너가 다시 화면 밖으로 밀려난다.
+    container.scrollTo({ top: 0, behavior: "smooth" });
+    const listTop = container.getBoundingClientRect().top + window.scrollY - 8;
+    if (window.scrollY > listTop) window.scrollTo({ top: Math.max(listTop, 0), behavior: "smooth" });
+  }
   const logoRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
@@ -543,7 +574,7 @@ function HomeContent() {
 
         <div className="relative z-0 order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
           {/* sticky 토글 밴드가 있을 때는 scroll-padding을 줘서 scrollIntoView 대상이 밴드 아래에 가려지지 않게 한다. */}
-          <div className={`no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2${showCandidateToggle ? " sm:scroll-pt-[72px]" : ""}`}>
+          <div ref={listScrollRef} className={`no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2${showCandidateToggle ? " sm:scroll-pt-[72px]" : ""}`}>
             {result && <div className={detailRestaurant ? "hidden" : undefined}>
               <MealPlanner
                 key={result.meal_context_id ?? "legacy-route"}
@@ -601,6 +632,19 @@ function HomeContent() {
               </div>
             )}
           </div>
+          {result && isListScrolledDown && (
+            <button
+              type="button"
+              onClick={scrollListToTop}
+              aria-label="목록 맨 위로"
+              className="fixed bottom-4 right-4 z-20 flex items-center gap-1.5 rounded-full border border-white/15 bg-[#29201a] px-3.5 py-2 text-xs font-semibold text-[#ffb45a] shadow-lg shadow-black/30 transition hover:bg-[#3a2a1e] sm:absolute sm:bottom-3 sm:right-3"
+            >
+              <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden="true">
+                <path d="M10 15V5m0 0L5.5 9.5M10 5l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              맨 위로
+            </button>
+          )}
         </div>
       </div>
     </main>

@@ -80,9 +80,6 @@ export default function RestaurantCard({
           <div className="flex items-start gap-3">
             {order && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-[#171310]">{order}</span>}
             <span className="flex-1 text-[15px] font-semibold leading-snug text-ink">{restaurant.name}</span>
-            {isAiPick && (
-              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-[#171310]">AI 추천</span>
-            )}
             {restaurant.category && (
               <span className="shrink-0 rounded-full bg-surface-hover px-2.5 py-0.5 text-xs font-medium text-ink-muted">
                 {restaurant.category}
@@ -113,8 +110,13 @@ export default function RestaurantCard({
             </div>
           )}
 
-          {restaurant.broadcasts.length > 0 && (
+          {/* AI 배지는 이름 줄이 아니라 태그 줄에 둔다 — 이름 줄은 순번·업종·저장 버튼이 이미
+              차지해서 배지까지 들어가면 좁은 패널에서 이름이 한 글자씩 세로로 꺾인다. */}
+          {(isAiPick || restaurant.broadcasts.length > 0) && (
             <div className="mt-2 flex flex-wrap gap-1.5">
+              {isAiPick && (
+                <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-[#171310]">AI 추천</span>
+              )}
               {restaurant.broadcasts.map((b) => (
                 <span
                   key={b}
