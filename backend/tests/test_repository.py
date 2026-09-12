@@ -3,7 +3,12 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import init_db, make_session_factory
 from app.models import Broadcast, Restaurant
-from app.repository import list_all_restaurants, list_broadcasts_with_counts, query_candidate_restaurants
+from app.repository import (
+    list_all_restaurants,
+    list_broadcasts_with_counts,
+    query_candidate_restaurants,
+    visible_broadcast_names,
+)
 
 
 def make_session_factory_in_memory():
@@ -163,3 +168,65 @@ def test_list_broadcasts_with_counts_counts_only_restaurants_with_coordinates():
         assert by_slug["ttoganjib"]["count"] == 1
         assert by_slug["empty"]["name"] == "텅빈방송"
         assert by_slug["empty"]["count"] == 0
+
+
+def seed_with_hidden_broadcast(session):
+    ttoganjib = Broadcast(id="ttoganjib", name="또간집")
+    hidden = Broadcast(id="kimyoungchul", name="동네한바퀴")
+    session.add_all([ttoganjib, hidden])
+
+    only_hidden = Restaurant(id="only-hidden", name="OnlyHidden", latitude=37.55, longitude=127.05)
+    only_hidden.broadcasts.append(hidden)
+    shared = Restaurant(id="shared", name="Shared", latitude=37.55, longitude=127.05)
+    shared.broadcasts.extend([hidden, ttoganjib])
+    visible = Restaurant(id="visible", name="Visible", latitude=37.55, longitude=127.05)
+    visible.broadcasts.append(ttoganjib)
+    no_broadcast = Restaurant(id="no-broadcast", name="NoBroadcast", latitude=37.55, longitude=127.05)
+
+    session.add_all([only_hidden, shared, visible, no_broadcast])
+    session.commit()
+
+
+def test_restaurants_seen_only_on_a_hidden_broadcast_are_dropped():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_with_hidden_broadcast(session)
+
+        all_ids = {r.id for r in list_all_restaurants(session)}
+        candidate_ids = {r.id for r in query_candidate_restaurants(session, 37.0, 38.0, 126.5, 127.5)}
+
+        for ids in (all_ids, candidate_ids):
+            assert "only-hidden" not in ids
+            # 다른 방송에도 나온 식당과 방송 태그가 없는 식당은 그대로 남는다.
+            assert {"shared", "visible", "no-broadcast"} <= ids
+
+
+def test_hidden_broadcast_is_stripped_from_visible_names():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_with_hidden_broadcast(session)
+
+        shared = next(r for r in list_all_restaurants(session) if r.id == "shared")
+        assert visible_broadcast_names(shared) == ["또간집"]
+
+
+def test_filtering_by_a_hidden_broadcast_returns_nothing():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_with_hidden_broadcast(session)
+
+        assert list_all_restaurants(session, broadcast_slug="동네한바퀴") == []
+        assert list_all_restaurants(session, broadcast_slug="kimyoungchul") == []
+        assert query_candidate_restaurants(session, 37.0, 38.0, 126.5, 127.5, broadcast_slug="동네한바퀴") == []
+        # 다른 방송 필터는 여전히 동작하고, 숨긴 방송과 공유된 식당도 포함한다.
+        assert {r.id for r in list_all_restaurants(session, broadcast_slug="또간집")} == {"shared", "visible"}
+
+
+def test_list_broadcasts_with_counts_omits_hidden_broadcast():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        seed_with_hidden_broadcast(session)
+
+        by_name = {b["name"]: b["count"] for b in list_broadcasts_with_counts(session)}
+        assert "동네한바퀴" not in by_name
+        assert by_name["또간집"] == 2

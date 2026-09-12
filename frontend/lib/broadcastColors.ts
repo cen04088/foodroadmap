@@ -12,7 +12,6 @@ export const BROADCAST_COLORS: Record<string, BroadcastColor> = {
   "허영만의 백반기행": { color: "#65A30D", letter: "허" },
   "한국인의 밥상": { color: "#9333EA", letter: "한" },
   "맛있는 녀석들": { color: "#0D9488", letter: "맛" },
-  동네한바퀴: { color: "#0891B2", letter: "동" },
   백년가게: { color: "#92400E", letter: "백" },
   비밀이야: { color: "#4F46E5", letter: "비" },
   "공간 탐닉": { color: "#0284C7", letter: "공" },

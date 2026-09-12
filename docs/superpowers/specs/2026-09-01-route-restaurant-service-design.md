@@ -22,8 +22,8 @@
   - **프로그램 목록**: `GET /broadcasts` 페이지에서 `href="/broadcast/{slug}"` 링크로 확인.
     확인된 슬러그: `ttoganjib`(또간집), `heukbaek`(흑백요리사), `tzuyang`(쯔양),
     `myeotkki`(쯔양 몇끼), `meogeulteonde`(먹을텐데), `jeonhyeonmu`(전현무계획),
-    `baekban`(허영만의 백반기행), `bapsang`(한국인의 밥상), `kimyoungchul`(맛있는 녀석들),
-    `matnyeoseok`(동네한바퀴), `baengnyeon`(백년가게), `bimirya`(비밀이야),
+    `baekban`(허영만의 백반기행), `bapsang`(한국인의 밥상), `matnyeoseok`(맛있는 녀석들),
+    `kimyoungchul`(동네한바퀴), `baengnyeon`(백년가게), `bimirya`(비밀이야),
     `tamnik`(공간 탐닉), `kimsawon`(김사원세끼).
   - **목록 페이지**: `GET /broadcast/{slug}?page=N`. 각 맛집은
     `<li><a class="bc-item" href="/place/{uuid}">` 안에 다음 구조로 존재:

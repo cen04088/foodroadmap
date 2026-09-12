@@ -17,7 +17,6 @@ export const BROADCASTS: { value: string; label: string }[] = [
   { value: "허영만의 백반기행", label: "허영만의 백반기행" },
   { value: "한국인의 밥상", label: "한국인의 밥상" },
   { value: "맛있는 녀석들", label: "맛있는 녀석들" },
-  { value: "동네한바퀴", label: "동네한바퀴" },
   { value: "백년가게", label: "백년가게" },
   { value: "비밀이야", label: "비밀이야" },
   { value: "공간 탐닉", label: "공간 탐닉" },

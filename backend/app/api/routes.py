@@ -23,6 +23,7 @@ from app.repository import (
     create_suggestion,
     list_all_restaurants,
     list_broadcasts_with_counts,
+    visible_broadcast_names,
     list_suggestions,
     query_candidate_restaurants,
 )
@@ -85,7 +86,7 @@ def _serialize_match(match: RestaurantMatch) -> dict:
         "youtube_url": restaurant.youtube_url,
         "distance_from_route_km": round(match.distance_from_route_km, 3),
         "cumulative_time_sec": round(match.cumulative_time_sec),
-        "broadcasts": [b.name for b in restaurant.broadcasts],
+        "broadcasts": visible_broadcast_names(restaurant),
         "menu": _top_menu_items(restaurant),
     }
 
@@ -101,7 +102,7 @@ def _serialize_restaurant(restaurant: Restaurant) -> dict:
         "phone": restaurant.phone,
         "hours": restaurant.hours,
         "youtube_url": restaurant.youtube_url,
-        "broadcasts": [b.name for b in restaurant.broadcasts],
+        "broadcasts": visible_broadcast_names(restaurant),
         "menu": _top_menu_items(restaurant),
     }
 

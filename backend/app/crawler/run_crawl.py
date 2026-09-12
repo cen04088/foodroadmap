@@ -16,7 +16,10 @@ MAX_PAGES = 100
 
 # 서비스에서 완전히 제외하기로 한 방송 (예: 쯔양 몇끼) — 재크롤링해도 다시
 # 추가되지 않도록 프로그램 목록 단계에서 걸러낸다.
-EXCLUDED_BROADCAST_SLUGS = {"myeotkki"}
+EXCLUDED_BROADCAST_SLUGS = {"myeotkki", "kimyoungchul"}
+# 표시명으로도 걸러낸다 — 사이트가 슬러그를 바꿔도 같은 방송이 다시 들어오지 않게.
+# 동네한바퀴(kimyoungchul)는 표본이 6곳뿐이라 제외 (app.repository.HIDDEN_BROADCAST_KEYS와 짝).
+EXCLUDED_BROADCAST_NAMES = {"동네한바퀴"}
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +140,9 @@ def run_crawl(session_factory=None) -> None:
         time.sleep(REQUEST_DELAY_SECONDS)
         programs_html = fetch_url(f"{BASE_URL}/broadcasts")
         programs = [
-            p for p in parse_broadcasts_list_page(programs_html) if p["slug"] not in EXCLUDED_BROADCAST_SLUGS
+            p
+            for p in parse_broadcasts_list_page(programs_html)
+            if p["slug"] not in EXCLUDED_BROADCAST_SLUGS and p["name"] not in EXCLUDED_BROADCAST_NAMES
         ]
 
         if not programs:
