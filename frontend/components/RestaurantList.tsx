@@ -13,6 +13,8 @@ export interface RestaurantListProps {
   onSelect: (id: string) => void;
   onShowDetail: (id: string) => void;
   scrollToId?: string | null;
+  // AI 식사 플래너가 고른 식당 id — 경로 전체 목록에서도 "AI 추천" 배지로 구분한다.
+  aiPickIds?: string[] | null;
 }
 
 export default function RestaurantList({
@@ -22,6 +24,7 @@ export default function RestaurantList({
   onSelect,
   onShowDetail,
   scrollToId,
+  aiPickIds,
 }: RestaurantListProps) {
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -53,6 +56,7 @@ export default function RestaurantList({
             order={index + 1}
             isSelected={selectedId === restaurant.id}
             isDimmed={activeFilters ? !matchesFilters(restaurant, activeFilters) : false}
+            isAiPick={aiPickIds?.includes(restaurant.id) ?? false}
             onSelect={onSelect}
             onShowDetail={onShowDetail}
           />

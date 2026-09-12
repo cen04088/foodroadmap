@@ -25,9 +25,19 @@ export default function MealPlanner({ contextId, restaurants, disabled, selected
   const [expired, setExpired] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const sequence = useRef(0);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const busy = disabled || loading || expired || !contextId || restaurants.length === 0;
 
   useEffect(() => () => { controller.current?.abort(); }, []);
+
+  // 경로 결과가 뜨면 AI 입력창에 바로 포커스 — 추천 요청이 결과 화면의 첫 동작이 되게 한다.
+  // 데스크톱만: 모바일은 키보드가 올라와 지도를 가리고 페이지가 입력창으로 튀어 오른다.
+  // 답변이 이미 있으면 건드리지 않는다 — 추천 카드를 살피는 중에 포커스를 빼앗지 않도록.
+  useEffect(() => {
+    if (busy || answer) return;
+    if (!window.matchMedia("(min-width: 640px)").matches) return;
+    inputRef.current?.focus({ preventScroll: true });
+  }, [contextId, busy, answer]);
 
   async function submit(text: string) {
     if (busy || !contextId || !text.trim()) return;
@@ -123,7 +133,7 @@ export default function MealPlanner({ contextId, restaurants, disabled, selected
 
         <form onSubmit={event => { event.preventDefault(); void submit(message); }}>
           <label htmlFor="meal-request" className="mb-2 block text-xs font-medium text-[#ffd19a]">{answer ? "조건을 바꿔볼까요?" : "어떤 식사를 원하세요?"}</label>
-          <textarea id="meal-request" value={message} onChange={event => setMessage(event.target.value)} maxLength={1000} rows={2} disabled={busy} placeholder="예: 한 시간 뒤, 한식으로 2만 원 이하" className="w-full resize-y rounded-xl border border-white/15 bg-[#171310] px-3 py-2.5 text-sm leading-6 text-[#fff7ed] outline-none placeholder:text-[#8d8074] focus:border-[#ffb45a] disabled:opacity-50" />
+          <textarea id="meal-request" ref={inputRef} value={message} onChange={event => setMessage(event.target.value)} maxLength={1000} rows={2} disabled={busy} placeholder="예: 한 시간 뒤, 한식으로 2만 원 이하" className="w-full resize-y rounded-xl border border-white/15 bg-[#171310] px-3 py-2.5 text-sm leading-6 text-[#fff7ed] outline-none placeholder:text-[#8d8074] focus:border-[#ffb45a] disabled:opacity-50" />
           <button type="submit" disabled={busy || !message.trim()} className="mt-2 w-full rounded-xl bg-[#ffb45a] px-3 py-2.5 text-sm font-bold text-[#211a14] transition hover:bg-[#ffd19a] disabled:cursor-not-allowed disabled:opacity-40">{loading ? "식사 조건을 읽고 있어요…" : answer ? "조건 바꿔 추천받기" : "내 경로에서 추천받기"}</button>
         </form>
         <div className="flex flex-wrap gap-1.5">

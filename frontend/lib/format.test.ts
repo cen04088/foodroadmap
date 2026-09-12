@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, formatDistance, formatWon } from "./format";
+import { formatDepartureOffset, formatDuration, formatDistance, formatWon } from "./format";
 
 describe("formatDuration", () => {
   it("formats under an hour as minutes only", () => {
@@ -30,5 +30,17 @@ describe("formatWon", () => {
     expect(formatWon(5000)).toBe("5,000원");
     expect(formatWon(16400)).toBe("16,400원");
     expect(formatWon(1234567)).toBe("1,234,567원");
+  });
+});
+
+describe("formatDepartureOffset", () => {
+  it("shows 출발 직후 for anything under a minute", () => {
+    expect(formatDepartureOffset(0)).toBe("출발 직후");
+    expect(formatDepartureOffset(59)).toBe("출발 직후");
+  });
+
+  it("falls back to 출발 후 + duration from one minute", () => {
+    expect(formatDepartureOffset(60)).toBe("출발 후 1분");
+    expect(formatDepartureOffset(3660)).toBe("출발 후 1시간 1분");
   });
 });

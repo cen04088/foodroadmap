@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDistance, formatDuration } from "../lib/format";
+import { formatDepartureOffset, formatDistance } from "../lib/format";
 import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getRestaurantThumbnailUrl } from "../lib/thumbnail";
@@ -26,6 +26,8 @@ export interface RestaurantCardProps {
   // 필터에 안 맞는 카드를 목록에서 지우지 않고 흑백+반투명으로 죽여서, 경로 전체 맥락은
   // 유지하면서 조건에 맞는 것만 도드라져 보이게 한다.
   isDimmed?: boolean;
+  // AI 식사 플래너가 고른 식당 — 이름 옆에 "AI 추천" 배지를 붙인다.
+  isAiPick?: boolean;
   onSelect: (id: string) => void;
   onShowDetail: (id: string) => void;
 }
@@ -35,6 +37,7 @@ export default function RestaurantCard({
   order,
   isSelected,
   isDimmed = false,
+  isAiPick = false,
   onSelect,
   onShowDetail,
 }: RestaurantCardProps) {
@@ -77,6 +80,9 @@ export default function RestaurantCard({
           <div className="flex items-start gap-3">
             {order && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-[#171310]">{order}</span>}
             <span className="flex-1 text-[15px] font-semibold leading-snug text-ink">{restaurant.name}</span>
+            {isAiPick && (
+              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-[#171310]">AI 추천</span>
+            )}
             {restaurant.category && (
               <span className="shrink-0 rounded-full bg-surface-hover px-2.5 py-0.5 text-xs font-medium text-ink-muted">
                 {restaurant.category}
@@ -101,7 +107,7 @@ export default function RestaurantCard({
 
           {hasRouteInfo && (
             <div className="mt-2 text-sm font-semibold text-accent-soft-ink">
-              출발 후 {formatDuration(restaurant.cumulative_time_sec!)}
+              {formatDepartureOffset(restaurant.cumulative_time_sec!)}
               <span className="mx-1.5 font-normal text-line">·</span>
               <span className="font-normal text-ink-muted">경로에서 {formatDistance(restaurant.distance_from_route_km!)}</span>
             </div>

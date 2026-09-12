@@ -591,11 +591,13 @@ function HomeContent() {
                   onSelect={handleSelectRestaurant}
                   onShowDetail={handleShowDetail}
                   scrollToId={listScrollTarget}
+                  aiPickIds={mealIds}
                 />}
               </>
             ) : (
               <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-white/10 px-4 text-center text-sm text-[#a89c91] sm:border-none">
-                출발지와 목적지를 정하면, 가는 길의 방송 맛집을 시간순으로 안내해드려요.
+                출발지와 목적지를 정하면 가는 길의 방송 맛집을 시간순으로 보여드리고,
+                AI에게 “한 시간 뒤 한식, 2만 원 이하”처럼 물어 딱 맞는 곳을 고를 수 있어요.
               </div>
             )}
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatDistance, formatDuration, formatWon } from "../lib/format";
+import { formatDepartureOffset, formatDistance, formatWon } from "../lib/format";
 import type { RestaurantSummary } from "../lib/api";
 import { getBroadcastColor } from "../lib/broadcastColors";
 import { getBroadcastImage } from "../lib/broadcastImages";
@@ -202,7 +202,7 @@ export default function RestaurantDetail({ restaurant, onBack }: RestaurantDetai
 
         {restaurant.distance_from_route_km !== undefined && restaurant.cumulative_time_sec !== undefined && (
           <div className="mt-4 rounded-xl bg-accent-soft px-4 py-3 text-sm text-ink">
-            <span className="font-bold text-accent-soft-ink">출발 후 {formatDuration(restaurant.cumulative_time_sec)}</span>
+            <span className="font-bold text-accent-soft-ink">{formatDepartureOffset(restaurant.cumulative_time_sec)}</span>
             <span className="text-ink-muted"> · 경로에서 {formatDistance(restaurant.distance_from_route_km)}</span>
           </div>
         )}
