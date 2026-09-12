@@ -101,7 +101,7 @@ export default function RestaurantCard({
 
           {hasRouteInfo && (
             <div className="mt-2 text-sm font-semibold text-accent-soft-ink">
-              🚗 출발 후 {formatDuration(restaurant.cumulative_time_sec!)}
+              출발 후 {formatDuration(restaurant.cumulative_time_sec!)}
               <span className="mx-1.5 font-normal text-line">·</span>
               <span className="font-normal text-ink-muted">경로에서 {formatDistance(restaurant.distance_from_route_km!)}</span>
             </div>

@@ -387,9 +387,13 @@ function HomeContent() {
     ? result.restaurants.filter((r) => matchesFilters(r, filters)).length
     : 0;
   const noFilterMatches = hasActiveRouteFilter && result !== null && result.restaurants.length > 0 && filteredMatchCount === 0;
+  // AI 추천 ↔ 경로 전체 토글 버튼 표시 여부. 리스트 패널 상단에 sticky로 고정된다.
+  const showCandidateToggle = result !== null && !detailRestaurant && mealIds !== null;
 
+  // main: 모바일은 overflow-x-clip — overflow-hidden은 스크롤 컨테이너로 취급되어 안쪽 sticky(토글 밴드)가
+  // 뷰포트가 아니라 main에 붙어 버린다. 데스크톱은 사이드바 접힘 translate를 잘라내야 하므로 hidden 유지.
   return (
-    <main className="relative flex min-h-screen w-full flex-col overflow-hidden sm:h-screen sm:min-h-0">
+    <main className="relative flex min-h-screen w-full flex-col overflow-x-clip sm:h-screen sm:min-h-0 sm:overflow-hidden">
       {/* 지도 — 데스크톱에서는 화면 전체를 채우는 배경, 모바일에서는 지금처럼 목록 위에 고정 높이로 위치.
           검색 전에는 전체 맛집을, 검색 후에는 경로상 맛집만 보여준다. */}
       <div ref={mapContainerRef} className="relative order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
@@ -602,7 +606,8 @@ function HomeContent() {
         )}
 
         <div className="relative z-0 order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
-          <div className="no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2">
+          {/* sticky 토글 밴드가 있을 때는 scroll-padding을 줘서 scrollIntoView 대상이 밴드 아래에 가려지지 않게 한다. */}
+          <div className={`no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2${showCandidateToggle ? " sm:scroll-pt-[72px]" : ""}`}>
             {result && <div className={detailRestaurant ? "hidden" : undefined}>
               <MealPlanner
                 key={result.meal_context_id ?? "legacy-route"}
@@ -614,10 +619,20 @@ function HomeContent() {
                 onSelect={handleMealSelect}
                 onDetail={handleShowDetail}
               />
-              {mealIds !== null && <button type="button" onClick={() => { setShowAllCandidates(value => !value); setFilters({ broadcast: "", category: "" }); }} className="mb-4 w-full rounded-xl border border-white/15 px-3 py-2.5 text-sm text-[#ffb45a] hover:bg-white/5">
-                {showAllCandidates ? "AI 추천만 지도에서 보기" : `경로 전체 ${result.restaurants.length}곳 보기`}
-              </button>}
             </div>}
+            {/* 리스트를 내려도 상단에 고정되는 토글 버튼 (모바일: 뷰포트 상단, 데스크톱: 패널 상단).
+                sticky는 부모 박스 범위 안에서만 유지되므로 MealPlanner 래퍼 밖, 스크롤 컨테이너 직속에 둔다.
+                데스크톱에서 sticky 요소는 패널의 content box(패딩 안쪽)에 갇히므로 top-0이면 패딩 12px 띠
+                사이로 카드가 비친다 — 패딩(p-3, short:p-2)만큼 음수 top/-mt/-mx 로 끌어올리고 같은 값의
+                pt/px로 되돌려서, 고정됐을 때 배경이 패널 윗변까지 덮고 버튼 위치는 원래 패딩 위치에 놓인다.
+                모바일은 바깥 컨테이너의 p-4 만큼 -mx-4/px-4 로 화면 가로를 다 덮고 페이지 배경색을 깐다. */}
+            {showCandidateToggle && result && (
+              <div className="sticky top-0 z-10 -mx-4 -mt-3 bg-paper px-4 pt-3 pb-4 sm:-top-3 sm:-mx-3 sm:bg-[#29201a] sm:px-3 sm:short:-top-2 sm:short:-mx-2 sm:short:-mt-2 sm:short:px-2 sm:short:pt-2">
+                <button type="button" onClick={() => { setShowAllCandidates(value => !value); setFilters({ broadcast: "", category: "" }); }} className="w-full rounded-xl border border-white/15 px-3 py-2.5 text-sm text-[#ffb45a] hover:bg-white/5">
+                  {showAllCandidates ? "AI 추천만 지도에서 보기" : `경로 전체 ${result.restaurants.length}곳 보기`}
+                </button>
+              </div>
+            )}
             {detailRestaurant ? (
               <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
             ) : result ? (
