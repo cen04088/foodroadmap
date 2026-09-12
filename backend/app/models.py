@@ -76,3 +76,14 @@ class Suggestion(Base):
     created_at = Column(DateTime, nullable=False, index=True)
     # 레이트리밋 판단에만 쓴다. 프록시 뒤라 X-Forwarded-For를 우선한다.
     client_ip = Column(String, nullable=True, index=True)
+
+
+class MealRouteContext(Base):
+    """Short-lived server-calculated candidates for meal recommendations."""
+
+    __tablename__ = "meal_route_contexts"
+
+    id = Column(String, primary_key=True)
+    payload = Column(Text, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    request_count = Column(Integer, nullable=False, default=0)

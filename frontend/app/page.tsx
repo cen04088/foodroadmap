@@ -11,6 +11,7 @@ import RestaurantList from "../components/RestaurantList";
 import RestaurantDetail from "../components/RestaurantDetail";
 import RestaurantListView from "../components/RestaurantListView";
 import SavedPlacesView from "../components/SavedPlacesView";
+import MealPlanner from "../components/MealPlanner";
 import {
   ApiError,
   fetchAllRestaurants,
@@ -79,6 +80,8 @@ function HomeContent() {
     category: initialParams.get("category") ?? "",
   }));
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
+  const [mealIds, setMealIds] = useState<string[] | null>(null);
+  const [showAllCandidates, setShowAllCandidates] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -230,6 +233,10 @@ function HomeContent() {
     setIsLoading(true);
     setErrorMessage(null);
     setDetailId(null);
+    setResult(null);
+    setMealIds(null);
+    setShowAllCandidates(false);
+    setSelectedId(null);
     try {
       // 방송/업종 필터는 백엔드에 안 보낸다 — 경로 후보 전체를 한 번만 받아두고,
       // 필터를 바꿀 때마다 재검색(카카오 길찾기 재호출 포함) 없이 클라이언트에서
@@ -283,6 +290,8 @@ function HomeContent() {
     searchSeqRef.current += 1;
     setIsLoading(false);
     setResult(null);
+    setMealIds(null);
+    setShowAllCandidates(false);
     setOrigin(null);
     setDestination(null);
     setSelectedId(null);
@@ -345,7 +354,27 @@ function HomeContent() {
   }
 
   const activeRestaurants = result ? result.restaurants : mapRestaurants;
+  const isMealFocused = mealIds !== null && !showAllCandidates;
+  const visibleMapRestaurants = isMealFocused
+    ? activeRestaurants.filter(r => mealIds.includes(r.id))
+    : activeRestaurants;
   const detailRestaurant = detailId ? activeRestaurants.find((r) => r.id === detailId) ?? null : null;
+
+  function handleMealRecommendations(ids: string[] | null) {
+    setMealIds(ids);
+    setShowAllCandidates(false);
+    setFilters({ broadcast: "", category: "" });
+    const first = activeRestaurants.find(r => r.id === ids?.[0]);
+    setSelectedId(first?.id ?? null);
+    if (first) setMapCenter({ lat: first.latitude, lng: first.longitude });
+    setDetailId(null);
+  }
+
+  function handleMealSelect(id: string) {
+    setSelectedId(id);
+    const restaurant = activeRestaurants.find(r => r.id === id);
+    if (restaurant) setMapCenter({ lat: restaurant.latitude, lng: restaurant.longitude });
+  }
 
   const isJourneyReady = Boolean(result && origin && destination);
   // 검색 후 부제에 쓰는 개수 — RestaurantList는 필터를 강조/흐림에만 쓰고 경로 후보
@@ -366,11 +395,11 @@ function HomeContent() {
       <div ref={mapContainerRef} className="relative order-3 min-h-0 p-4 pb-0 sm:absolute sm:inset-0 sm:p-0">
         <MapView
           route={result?.route.points ?? []}
-          restaurants={activeRestaurants}
+          restaurants={visibleMapRestaurants}
           highlightedRestaurantId={selectedId}
           center={mapCenter}
           activeBroadcast={(result ? filters.broadcast : browseBroadcast) || null}
-          activeFilters={result ? filters : null}
+          activeFilters={result && !isMealFocused ? filters : null}
           onBoundsIdle={handleBoundsIdle}
           onMarkerClick={handleMarkerClick}
           onShowDetail={handleShowDetail}
@@ -560,7 +589,7 @@ function HomeContent() {
                 initialDestination={formDestination}
               />
             </div>
-            {isJourneyReady && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
+            {isJourneyReady && !isMealFocused && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
           </div>
         </div>
 
@@ -574,6 +603,21 @@ function HomeContent() {
 
         <div className="relative z-0 order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
           <div className="no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2">
+            {result && <div className={detailRestaurant ? "hidden" : undefined}>
+              <MealPlanner
+                key={result.meal_context_id ?? "legacy-route"}
+                contextId={result.meal_context_id}
+                restaurants={result.restaurants}
+                disabled={isLoading}
+                selectedId={selectedId}
+                onRecommendations={handleMealRecommendations}
+                onSelect={handleMealSelect}
+                onDetail={handleShowDetail}
+              />
+              {mealIds !== null && <button type="button" onClick={() => { setShowAllCandidates(value => !value); setFilters({ broadcast: "", category: "" }); }} className="mb-4 w-full rounded-xl border border-white/15 px-3 py-2.5 text-sm text-[#ffb45a] hover:bg-white/5">
+                {showAllCandidates ? "AI 추천만 지도에서 보기" : `경로 전체 ${result.restaurants.length}곳 보기`}
+              </button>}
+            </div>}
             {detailRestaurant ? (
               <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
             ) : result ? (
@@ -589,14 +633,14 @@ function HomeContent() {
                     이 조건에 맞는 곳이 없어요 — 경로 전체 결과를 보여드려요
                   </div>
                 )}
-                <RestaurantList
+                {!isMealFocused && <RestaurantList
                   restaurants={result.restaurants}
                   selectedId={selectedId}
                   activeFilters={filters}
                   onSelect={handleSelectRestaurant}
                   onShowDetail={handleShowDetail}
                   scrollToId={listScrollTarget}
-                />
+                />}
               </>
             ) : (
               <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-white/10 px-4 text-center text-sm text-[#a89c91] sm:border-none">

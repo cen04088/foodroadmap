@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from threading import BoundedSemaphore
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
@@ -15,6 +16,8 @@ from app.geo import bounding_box_with_margin, downsample_route_points
 from app.kakao.directions import KakaoDirectionsError, fetch_route, parse_route_points, parse_route_summary
 from app.matching import RestaurantMatch, match_restaurants_to_route
 from app.models import Restaurant
+from app.meal_context import consume_context, save_context
+from app.meal_planner import MealRequest, PlannerError, interpret_preferences, recommend_meal
 from app.repository import (
     count_suggestions_from_ip_since,
     create_suggestion,
@@ -42,6 +45,7 @@ SUGGESTION_CONTACT_MAX = 200
 
 _ENGINE = make_engine()
 _SESSION_FACTORY = make_session_factory(_ENGINE)
+_MEAL_SLOTS = BoundedSemaphore(4)
 
 
 def get_session():
@@ -129,6 +133,7 @@ def get_restaurants(
 
 @router.get("/api/route-restaurants")
 def get_route_restaurants(
+    response: Response,
     origin: str = Query(..., description="lat,lng"),
     destination: str = Query(..., description="lat,lng"),
     radius_km: float = Query(DEFAULT_RADIUS_KM, gt=0, le=50),
@@ -136,6 +141,7 @@ def get_route_restaurants(
     category: str | None = Query(None),
     session: Session = Depends(get_session),
 ):
+    response.headers["Cache-Control"] = "no-store"
     origin_lat, origin_lng = _parse_lat_lng(origin)
     dest_lat, dest_lng = _parse_lat_lng(destination)
 
@@ -168,14 +174,38 @@ def get_route_restaurants(
     matching_points = downsample_route_points(route_points, MAX_ROUTE_POINTS_FOR_MATCHING)
     matches = match_restaurants_to_route(matching_points, candidates, radius_km)
 
+    restaurants = [_serialize_match(m) for m in matches]
+    # Keep every collected menu for budget matching; normal cards still show only the top 3.
+    meal_candidates = [
+        {**restaurant, "menu": _top_menu_items(match.restaurant, len(match.restaurant.menu_items))}
+        for restaurant, match in zip(restaurants, matches)
+    ]
+    context_id = save_context(session, meal_candidates)
+
     return {
         "route": {
             "total_distance_m": route_summary["total_distance_m"],
             "total_duration_sec": route_summary["total_duration_sec"],
             "points": route_points,
         },
-        "restaurants": [_serialize_match(m) for m in matches],
+        "restaurants": restaurants,
+        "meal_context_id": context_id,
     }
+
+
+@router.post("/api/meal-recommendations")
+def post_meal_recommendations(payload: MealRequest, response: Response, session: Session = Depends(get_session)):
+    response.headers["Cache-Control"] = "no-store"
+    if not _MEAL_SLOTS.acquire(blocking=False):
+        raise HTTPException(429, detail="AI 요청이 많아요. 잠시 후 다시 시도해주세요.")
+    try:
+        candidates = consume_context(session, payload.route_context_id)
+        preferences = interpret_preferences(payload.message, payload.previous, candidates)
+        return recommend_meal(candidates, preferences)
+    except PlannerError as exc:
+        raise HTTPException(exc.status, detail=str(exc)) from exc
+    finally:
+        _MEAL_SLOTS.release()
 
 
 class SuggestionRequest(BaseModel):

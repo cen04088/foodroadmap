@@ -31,12 +31,63 @@ export interface RestaurantResult extends RestaurantSummary {
 }
 
 export interface RouteRestaurantsResponse {
+  meal_context_id?: string;
   route: {
     total_distance_m: number;
     total_duration_sec: number;
     points: RoutePoint[];
   };
   restaurants: RestaurantResult[];
+}
+
+export interface MealPreferences {
+  categories: string[];
+  broadcasts: string[];
+  menu_keywords: string[];
+  excluded_keywords: string[];
+  max_price_won: number | null;
+  target_minutes: number | null;
+  time_window_minutes: number;
+  sort: "timing" | "earliest" | "price";
+  unverified: string[];
+  clarification: string | null;
+}
+
+export interface MealRecommendationResponse {
+  preferences: MealPreferences;
+  reply: string;
+  notes: string[];
+  matched_count: number;
+  recommendations: {
+    restaurant_id: string;
+    reasons: string[];
+    menu: MenuItemSummary | null;
+  }[];
+}
+
+export async function fetchMealRecommendations(
+  params: { route_context_id: string; message: string; previous: MealPreferences | null },
+  signal?: AbortSignal,
+  baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "",
+): Promise<MealRecommendationResponse> {
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/api/meal-recommendations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+      signal,
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new ApiError(0, "서버에 연결하지 못했어요. 연결 상태를 확인하고 다시 시도해주세요.");
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(response.status, typeof data?.detail === "string"
+      ? data.detail : "추천을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+  }
+  return response.json();
 }
 
 export class ApiError extends Error {
