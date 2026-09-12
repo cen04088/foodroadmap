@@ -1,8 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import SearchForm, { type SelectedPlace } from "../components/SearchForm";
 import FilterBar, { type Filters } from "../components/FilterBar";
 import MapFilter from "../components/MapFilter";
@@ -35,19 +34,6 @@ function errorMessageFor(error: unknown): string {
   return "알 수 없는 오류가 발생했습니다";
 }
 
-// 출발지·목적지는 이름과 좌표가 모두 있어야 복원되므로 세 개의 파라미터로 나눠 싣는다 —
-// "이름@위도,경도" 한 덩어리로 넣으면 이름에 쉼표나 @가 들어갔을 때 다시 못 쪼갠다.
-function placeFromParams(
-  params: URLSearchParams,
-  prefix: "from" | "to"
-): SelectedPlace | null {
-  const label = params.get(prefix);
-  const lat = Number(params.get(`${prefix}_lat`));
-  const lng = Number(params.get(`${prefix}_lng`));
-  if (!label || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { label, lat, lng };
-}
-
 function CrosshairIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
@@ -66,19 +52,10 @@ function Chevron({ className }: { className?: string }) {
 }
 
 function HomeContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  // 최초 렌더의 URL을 한 번만 붙잡아 둔다 — 이후로는 상태가 URL을 쓰는 단방향이라,
-  // 매 렌더에 searchParams를 다시 읽으면 우리가 쓴 값을 되읽어 루프가 된다.
-  // (ref가 아니라 state인 이유: 렌더 중에 읽어야 하는 값이다.)
-  const [initialParams] = useState(() => new URLSearchParams(searchParams.toString()));
-  const [origin, setOrigin] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "from"));
-  const [destination, setDestination] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "to"));
-  const [filters, setFilters] = useState<Filters>(() => ({
-    broadcast: initialParams.get("broadcast") ?? "",
-    category: initialParams.get("category") ?? "",
-  }));
+  // 검색 상태는 URL에 싣지 않는다 — 새로고침하면 항상 처음 화면(검색 전)으로 돌아간다.
+  const [origin, setOrigin] = useState<SelectedPlace | null>(null);
+  const [destination, setDestination] = useState<SelectedPlace | null>(null);
+  const [filters, setFilters] = useState<Filters>({ broadcast: "", category: "" });
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
   const [mealIds, setMealIds] = useState<string[] | null>(null);
   const [showAllCandidates, setShowAllCandidates] = useState(false);
@@ -89,13 +66,13 @@ function HomeContent() {
   const [listScrollTarget, setListScrollTarget] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [mapRestaurants, setMapRestaurants] = useState<RestaurantSummary[]>([]);
-  const [browseBroadcast, setBrowseBroadcast] = useState(() => initialParams.get("broadcast") ?? "");
+  const [browseBroadcast, setBrowseBroadcast] = useState("");
   // geolocation 상태 — 권한 거부/미지원을 사용자에게 알려줘야 버튼이 먹통처럼 보이지 않는다.
   const [geoStatus, setGeoStatus] = useState<"idle" | "locating" | "denied" | "unavailable">("idle");
   // 검색 폼에 지금 들어 있는 값. 검색된 경로(origin/destination)와는 별개다 — 결과를
   // 보는 중에 한쪽만 바꿔도 위쪽 요약은 그대로여야 한다.
-  const [formOrigin, setFormOrigin] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "from"));
-  const [formDestination, setFormDestination] = useState<SelectedPlace | null>(() => placeFromParams(initialParams, "to"));
+  const [formOrigin, setFormOrigin] = useState<SelectedPlace | null>(null);
+  const [formDestination, setFormDestination] = useState<SelectedPlace | null>(null);
   // "저장한 곳 -> 출발지로"처럼 밖에서 폼 값을 넣을 때만 올린다. SearchForm의 key로
   // 써서 새 초기값으로 다시 마운트시킨다 — 입력창의 표시 텍스트를 부모가 직접
   // 밀어 넣으려면 타이핑 중인 값과 싸우게 되고, 그 동기화가 버그의 온상이다.
@@ -159,30 +136,6 @@ function HomeContent() {
         setMapRestaurants([]);
       });
   }, [browseBroadcast, viewBounds]);
-
-  // 상태 -> URL 단방향 동기화. 검색한 경로와 필터가 주소에 남아야 새로고침해도
-  // 유지되고, 링크로 공유했을 때 상대가 같은 화면을 본다.
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (origin) {
-      params.set("from", origin.label);
-      // 소수점 6자리면 약 11cm — 좌표를 그대로 넣으면 주소가 쓸데없이 길어진다.
-      params.set("from_lat", origin.lat.toFixed(6));
-      params.set("from_lng", origin.lng.toFixed(6));
-    }
-    if (destination) {
-      params.set("to", destination.label);
-      params.set("to_lat", destination.lat.toFixed(6));
-      params.set("to_lng", destination.lng.toFixed(6));
-    }
-    // 경로 모드와 브라우즈 모드는 각자 필터를 들고 있다 — 지금 보고 있는 쪽을 싣는다.
-    const broadcast = result ? filters.broadcast : browseBroadcast;
-    if (broadcast) params.set("broadcast", broadcast);
-    if (result && filters.category) params.set("category", filters.category);
-
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [origin, destination, filters, browseBroadcast, result, router, pathname]);
 
   function roundedBoundsKey(bounds: MapBounds): string {
     return `${bounds.minLat.toFixed(4)},${bounds.maxLat.toFixed(4)},${bounds.minLng.toFixed(4)},${bounds.maxLng.toFixed(4)}`;
@@ -258,23 +211,6 @@ function HomeContent() {
       setIsLoading(false);
     }
   }
-
-  // 출발지·목적지가 실린 링크로 들어왔으면 바로 검색해준다 — 공유받은 사람이
-  // 버튼을 한 번 더 누르지 않아도 같은 화면을 본다.
-  const didRestoreSearchRef = useRef(false);
-  useEffect(() => {
-    if (didRestoreSearchRef.current) return;
-    didRestoreSearchRef.current = true;
-    const from = placeFromParams(initialParams, "from");
-    const to = placeFromParams(initialParams, "to");
-    // runSearch가 곧바로 setIsLoading을 부르므로, effect 안에서 동기로 호출하면
-    // 마운트 렌더에 연쇄 렌더가 붙는다. 한 틱 미뤄 첫 페인트를 막지 않는다.
-    // (cleanup으로 취소하지 않는 건 의도적 — StrictMode의 이중 실행은 위 ref가
-    //  막아주는데, 여기서 clearTimeout까지 하면 개발 모드에서 검색이 아예 안 뜬다.)
-    if (from && to) setTimeout(() => runSearch(from, to), 0);
-    // 최초 1회만 — initialParams는 첫 렌더에 고정된 값이라 의존성이 바뀌지 않는다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function handleSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace) {
     setOrigin(searchOrigin);
@@ -670,9 +606,5 @@ function HomeContent() {
 }
 
 export default function Home() {
-  return (
-    <Suspense fallback={null}>
-      <HomeContent />
-    </Suspense>
-  );
+  return <HomeContent />;
 }

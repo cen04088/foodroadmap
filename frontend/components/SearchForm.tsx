@@ -17,8 +17,8 @@ export interface SearchFormProps {
   onDestinationChange?: (place: SelectedPlace | null) => void;
   onSearch: (origin: SelectedPlace, destination: SelectedPlace) => void;
   isLoading: boolean;
-  // 공유 링크로 들어온 경우 URL에 실려 있던 장소 — 입력창을 채워두어야 사용자가
-  // 어떤 경로를 보고 있는지 알 수 있고, 한쪽만 바꿔 다시 검색할 수 있다.
+  // 부모가 밖에서 넣어주는 장소("저장한 곳 -> 출발지로" 등). 마운트 시 입력창을 채워두어
+  // 사용자가 어떤 경로를 보고 있는지 알 수 있고, 한쪽만 바꿔 다시 검색할 수 있다.
   initialOrigin?: SelectedPlace | null;
   initialDestination?: SelectedPlace | null;
 }
