@@ -6,7 +6,17 @@ KAKAO_DIRECTIONS_URL = "https://apis-navi.kakaomobility.com/v1/directions"
 
 
 class KakaoDirectionsError(Exception):
-    pass
+    """길찾기 호출 자체가 실패한 경우(네트워크, HTTP 오류, JSON 아님). 재시도하면 될 수도 있다."""
+
+
+class KakaoRouteError(KakaoDirectionsError):
+    """카카오가 응답은 했지만 경로를 만들지 못한 경우(출발/도착지 주변 도로 없음, 자동차 진입 불가,
+    결과 없음 등). 같은 좌표로 재시도해도 결과가 같으므로 호출자는 사용자에게 장소를 바꾸라고 안내한다."""
+
+    def __init__(self, result_code: int | None, result_msg: str | None):
+        super().__init__(f"Kakao Directions API error [{result_code}]: {result_msg}")
+        self.result_code = result_code
+        self.result_msg = result_msg or ""
 
 
 def fetch_route(
@@ -16,12 +26,17 @@ def fetch_route(
     dest_lng: float,
     api_key: str,
     *,
-    timeout: float = 10.0,
+    # (연결, 응답) 초. 서울→부산처럼 긴 경로는 응답 본문이 수 MB라 읽기 시간을 넉넉히 준다.
+    timeout: float | tuple[float, float] = (5.0, 20.0),
+    # 카카오 유고(교통 통제) 정보 반영 옵션. 2면 전체 미반영 — 통제 때문에 경로가 안 나올 때 재시도용.
+    roadevent: int | None = None,
 ) -> dict:
     params = {
         "origin": f"{origin_lng},{origin_lat}",
         "destination": f"{dest_lng},{dest_lat}",
     }
+    if roadevent is not None:
+        params["roadevent"] = str(roadevent)
     headers = {"Authorization": f"KakaoAK {api_key}"}
 
     try:
@@ -99,10 +114,10 @@ def parse_route_points(response: dict) -> list[dict]:
 def _first_route(response: dict) -> dict:
     routes = response.get("routes") or []
     if not routes:
-        raise KakaoDirectionsError("Kakao Directions API returned no routes")
+        raise KakaoRouteError(None, "경로 결과가 없습니다")
 
     route = routes[0]
     if route.get("result_code", 0) != 0:
-        raise KakaoDirectionsError(f"Kakao Directions API error: {route.get('result_msg')}")
+        raise KakaoRouteError(route.get("result_code"), route.get("result_msg"))
 
     return route

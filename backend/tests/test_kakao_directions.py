@@ -272,3 +272,28 @@ def test_parse_route_points_handles_degenerate_road_in_middle():
     assert points[2]["lng"] == pytest.approx(127.1)
     assert points[2]["cumulative_distance_m"] == pytest.approx(expected_cumulative_distance)
     assert points[2]["cumulative_time_sec"] == pytest.approx(expected_cumulative_time)
+
+
+def test_nonzero_result_code_raises_route_error_with_code_and_message():
+    from app.kakao.directions import KakaoRouteError, parse_route_summary
+
+    response = {"routes": [{"result_code": 103, "result_msg": "도착 지점 주변의 도로를 탐색할 수 없음"}]}
+    with pytest.raises(KakaoRouteError) as info:
+        parse_route_summary(response)
+    assert info.value.result_code == 103
+    assert info.value.result_msg == "도착 지점 주변의 도로를 탐색할 수 없음"
+    # 호출 실패(KakaoDirectionsError)와 구분되지만 그 하위 타입이라 기존 핸들러도 잡는다.
+    assert isinstance(info.value, KakaoDirectionsError)
+
+
+def test_fetch_route_passes_roadevent_only_when_given():
+    fake_response = Mock()
+    fake_response.raise_for_status = Mock()
+    fake_response.json = Mock(return_value=FAKE_RESPONSE)
+
+    with patch("app.kakao.directions.requests.get", return_value=fake_response) as mock_get:
+        fetch_route(37.5, 127.0, 37.6, 127.1, api_key="test-key")
+        assert "roadevent" not in mock_get.call_args.kwargs["params"]
+        fetch_route(37.5, 127.0, 37.6, 127.1, api_key="test-key", roadevent=2)
+        assert mock_get.call_args.kwargs["params"]["roadevent"] == "2"
+

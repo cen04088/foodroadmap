@@ -16,6 +16,7 @@ import {
   ApiError,
   fetchAllRestaurants,
   fetchRouteRestaurants,
+  type EndpointAdjustment,
   type MapBounds,
   type RestaurantSummary,
   type RouteRestaurantsResponse,
@@ -29,10 +30,23 @@ function errorMessageFor(error: unknown): string {
     if (error.status === 0) return "서버에 연결할 수 없습니다";
     if (error.status === 500) return "일시적인 오류입니다, 잠시 후 다시 시도해주세요";
     if (error.status === 502) return "경로를 가져오지 못했습니다, 다시 시도해주세요";
-    if (error.status === 422) return "선택한 위치 근처에서 자동차 경로를 찾을 수 없어요, 다른 장소를 선택해보세요";
+    // 422는 서버가 카카오의 사유("도착 지점 주변의 도로를 탐색할 수 없음" 등)를 detail에 실어 준다.
+    // 스키마 검증 실패처럼 detail이 문자열이 아니면 기본 문구("요청 실패: 422")가 오므로 그때만 대체한다.
+    if (error.status === 422) {
+      return error.message.startsWith("요청 실패") ? "선택한 위치 근처에서 자동차 경로를 찾을 수 없어요, 다른 장소를 선택해보세요" : error.message;
+    }
     return "요청 중 오류가 발생했습니다";
   }
   return "알 수 없는 오류가 발생했습니다";
+}
+
+// 출발/도착지를 가까운 도로 지점으로 옮겨 계산한 경우의 안내 문구. 사용자가 고른 곳이 아니라
+// 몇백 m 떨어진 지점까지의 경로라는 걸 숨기지 않는다.
+function adjustmentNotice(endpoint: "origin" | "destination", adjustment: EndpointAdjustment): string {
+  const place = endpoint === "origin" ? "출발지" : "목적지";
+  if (adjustment.offset_m === 0) return `${place} 주변 도로에 교통 통제 정보가 있어 이를 제외하고 경로를 계산했어요.`;
+  const tail = endpoint === "origin" ? "에서 출발하는 경로로 안내해요" : "까지 가는 경로로 안내해요";
+  return `${place} 주변은 차량 진입이 어려워 약 ${adjustment.offset_m}m 떨어진 가장 가까운 도로 지점${tail}.`;
 }
 
 function CrosshairIcon({ className }: { className?: string }) {
@@ -239,6 +253,8 @@ function HomeContent() {
       setIsSearchCollapsed(true);
     } catch (error) {
       if (seq !== searchSeqRef.current) return;
+      // 화면에는 요약 문구만 보이니, 서버 detail(카카오 사유·상태 코드)은 콘솔에 남겨 원인 추적에 쓴다.
+      console.warn("경로 검색 실패", error);
       setErrorMessage(errorMessageFor(error));
     } finally {
       if (seq !== searchSeqRef.current) return;
@@ -370,6 +386,10 @@ function HomeContent() {
     ? result.restaurants.filter((r) => matchesFilters(r, filters)).length
     : 0;
   const noFilterMatches = hasActiveRouteFilter && result !== null && result.restaurants.length > 0 && filteredMatchCount === 0;
+  const adjustmentNotices = (["origin", "destination"] as const).flatMap((endpoint) => {
+    const adjustment = result?.adjustments?.[endpoint];
+    return adjustment ? [adjustmentNotice(endpoint, adjustment)] : [];
+  });
   // 'AI 추천 보기' ↔ '경로 전체 N곳 보기' 토글 표시 여부. 리스트 패널 상단에 sticky로 고정된다.
   const showViewToggle = result !== null && !detailRestaurant;
 
@@ -628,6 +648,11 @@ function HomeContent() {
                     <span className="text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
                   </div>
                 )}
+                {adjustmentNotices.map((notice) => (
+                  <div key={notice} className="mb-3 rounded-xl border border-[#ffb45a]/30 bg-[#ffb45a]/10 px-3 py-2 text-xs leading-5 text-[#ffd19a]">
+                    {notice}
+                  </div>
+                ))}
                 {noFilterMatches && (
                   <div className="mb-3 rounded-xl bg-white/5 px-3 py-2 text-xs text-[#a89c91]">
                     이 조건에 맞는 곳이 없어요 — 경로 전체 결과를 보여드려요

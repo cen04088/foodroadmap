@@ -116,6 +116,42 @@ def test_get_route_restaurants_returns_nearby_restaurant_with_expected_shape(mon
     assert "cumulative_time_sec" in near_result
     assert near_result["youtube_url"] == "https://www.youtube.com/watch?v=abc123"
     assert near_result["menu"] == [{"name": "대표 메뉴", "price_won": 12000, "is_representative": True}]
+    assert body["adjustments"] == {"origin": None, "destination": None}
+
+
+def test_get_route_restaurants_snaps_a_blocked_destination_and_reports_the_adjustment(monkeypatch):
+    from app.kakao.route_fallback import offset_point
+
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    good = offset_point(37.6, 127.1, 200, 0)
+
+    def fake_fetch(o_lat, o_lng, d_lat, d_lng, api_key, **kwargs):
+        if abs(d_lat - good[0]) < 1e-9 and abs(d_lng - good[1]) < 1e-9:
+            return FAKE_KAKAO_RESPONSE
+        return {"routes": [{"result_code": 302, "result_msg": "도착 지점 주변의 도로에 자동차 진입 불가"}]}
+
+    monkeypatch.setattr("app.api.routes.fetch_route", fake_fetch)
+    session_factory = make_test_session_factory()
+    seed(session_factory)
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+
+    client = TestClient(app)
+    try:
+        response = client.get(
+            "/api/route-restaurants",
+            params={"origin": "37.5,127.0", "destination": "37.6,127.1"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["adjustments"]["origin"] is None
+    adjusted = body["adjustments"]["destination"]
+    assert adjusted["offset_m"] == 200
+    assert "진입 불가" in adjusted["reason"]
+    assert abs(adjusted["lat"] - good[0]) < 1e-9 and abs(adjusted["lng"] - good[1]) < 1e-9
+    assert [r["name"] for r in body["restaurants"]] and "Near Restaurant" in [r["name"] for r in body["restaurants"]]
 
 
 def test_get_route_restaurants_filters_by_broadcast_query_param(monkeypatch):
@@ -265,9 +301,9 @@ def test_get_route_restaurants_returns_422_when_kakao_cannot_find_road_near_poin
     monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
 
     def raise_error(*args, **kwargs):
-        from app.kakao.directions import KakaoDirectionsError
+        from app.kakao.directions import KakaoRouteError
 
-        raise KakaoDirectionsError("Kakao Directions API error: 시작 지점 주변의 도로를 탐색할 수 없음")
+        raise KakaoRouteError(102, "시작 지점 주변의 도로를 탐색할 수 없음")
 
     monkeypatch.setattr("app.api.routes.fetch_route", raise_error)
 
@@ -278,4 +314,24 @@ def test_get_route_restaurants_returns_422_when_kakao_cannot_find_road_near_poin
     )
 
     assert response.status_code == 422
-    assert "다른 장소를 선택" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "다른 장소를 선택" in detail
+    assert "시작 지점 주변의 도로를 탐색할 수 없음" in detail
+
+
+def test_get_route_restaurants_returns_422_with_kakao_reason_for_any_nonzero_result_code(monkeypatch):
+    # 카카오가 응답은 했지만 result_code != 0 — 진입 불가·거리 제한 등 어떤 사유든 재시도가 아니라 장소 변경 안내.
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "app.api.routes.fetch_route",
+        lambda *args, **kwargs: {"routes": [{"result_code": 302, "result_msg": "도착 지점 주변의 도로에 자동차 진입 불가"}]},
+    )
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/route-restaurants",
+        params={"origin": "37.5,127.0", "destination": "37.6,127.1"},
+    )
+
+    assert response.status_code == 422
+    assert "도착 지점 주변의 도로에 자동차 진입 불가" in response.json()["detail"]

@@ -1,3 +1,5 @@
+import logging
+from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from threading import BoundedSemaphore
 
@@ -13,7 +15,8 @@ from app.config import (
 )
 from app.db import make_engine, make_session_factory
 from app.geo import bounding_box_with_margin, downsample_route_points
-from app.kakao.directions import KakaoDirectionsError, fetch_route, parse_route_points, parse_route_summary
+from app.kakao.directions import KakaoDirectionsError, KakaoRouteError, fetch_route, parse_route_points, parse_route_summary
+from app.kakao.route_fallback import resolve_route
 from app.matching import RestaurantMatch, match_restaurants_to_route
 from app.models import Restaurant
 from app.meal_context import consume_context, save_context
@@ -28,6 +31,8 @@ from app.repository import (
     list_suggestions,
     query_candidate_restaurants,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -153,17 +158,22 @@ def get_route_restaurants(
         raise HTTPException(status_code=500, detail="서버 설정 오류: 카카오 API 키가 설정되지 않았습니다") from exc
 
     try:
-        raw_response = fetch_route(origin_lat, origin_lng, dest_lat, dest_lng, api_key)
+        # 출발/도착지 주변 도로 문제면 가까운 도로 지점으로 옮겨 다시 시도한다 — 보정 내역은 응답에 실어 화면에 알린다.
+        raw_response, adjustments = resolve_route(origin_lat, origin_lng, dest_lat, dest_lng, api_key, fetch=fetch_route)
         route_points = parse_route_points(raw_response)
         route_summary = parse_route_summary(raw_response)
+    except KakaoRouteError as exc:
+        # 카카오가 경로 자체를 못 만든 경우(출발/도착지 주변 도로 없음, 자동차 진입 불가, 결과 없음 등) —
+        # 같은 좌표로 재시도해도 결과가 같으니 일시적 오류(502)와 구분해 422로 보내고, 카카오가 준
+        # 사유를 그대로 실어 사용자가 어느 쪽 장소를 바꿔야 하는지 알 수 있게 한다.
+        logger.warning("kakao route error origin=%s destination=%s code=%s msg=%s", origin, destination, exc.result_code, exc.result_msg)
+        reason = f" ({exc.result_msg})" if exc.result_msg else ""
+        raise HTTPException(
+            status_code=422,
+            detail=f"선택한 위치로는 자동차 경로를 찾을 수 없어요{reason}. 다른 장소를 선택해보세요",
+        ) from exc
     except KakaoDirectionsError as exc:
-        if "탐색할 수 없음" in str(exc):
-            # 출발/도착 좌표 주변에 카카오 도로 데이터가 없는 경우 (섬, 사유지 등) — 재시도해도 동일하게 실패하므로
-            # 일시적 오류(502)와 구분해 다른 장소를 선택하라고 안내한다.
-            raise HTTPException(
-                status_code=422,
-                detail="선택한 위치 근처에서 자동차 경로를 찾을 수 없어요. 다른 장소를 선택해보세요",
-            ) from exc
+        logger.warning("kakao directions request failed origin=%s destination=%s: %s", origin, destination, exc)
         raise HTTPException(status_code=502, detail=f"경로를 가져오지 못했습니다: {exc}") from exc
 
     if len(route_points) < 2:
@@ -192,6 +202,7 @@ def get_route_restaurants(
         },
         "restaurants": restaurants,
         "meal_context_id": context_id,
+        "adjustments": {endpoint: (asdict(a) if a else None) for endpoint, a in adjustments.items()},
     }
 
 
