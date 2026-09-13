@@ -58,7 +58,9 @@ function HomeContent() {
   const [filters, setFilters] = useState<Filters>({ broadcast: "", category: "" });
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
   const [mealIds, setMealIds] = useState<string[] | null>(null);
-  const [showAllCandidates, setShowAllCandidates] = useState(false);
+  // 검색 결과는 전체 목록부터 보여주고, 상단의 'AI 추천 보기'로 AI 플래너 화면을 연다.
+  // 열려 있으면 목록 대신 플래너가 보이고, 추천이 있을 때 지도는 추천 식당만 표시한다.
+  const [isAiViewOpen, setIsAiViewOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -219,7 +221,7 @@ function HomeContent() {
     setDetailId(null);
     setResult(null);
     setMealIds(null);
-    setShowAllCandidates(false);
+    setIsAiViewOpen(false);
     setSelectedId(null);
     try {
       // 방송/업종 필터는 백엔드에 안 보낸다 — 경로 후보 전체를 한 번만 받아두고,
@@ -258,7 +260,7 @@ function HomeContent() {
     setIsLoading(false);
     setResult(null);
     setMealIds(null);
-    setShowAllCandidates(false);
+    setIsAiViewOpen(false);
     setOrigin(null);
     setDestination(null);
     setSelectedId(null);
@@ -321,7 +323,8 @@ function HomeContent() {
   }
 
   const activeRestaurants = result ? result.restaurants : mapRestaurants;
-  const isMealFocused = mealIds !== null && !showAllCandidates;
+  // AI 화면이 열려 있고 추천이 있을 때만 지도를 추천 식당으로 좁힌다.
+  const isMealFocused = isAiViewOpen && mealIds !== null;
   const visibleMapRestaurants = isMealFocused
     ? activeRestaurants.filter(r => mealIds.includes(r.id))
     : activeRestaurants;
@@ -329,12 +332,18 @@ function HomeContent() {
 
   function handleMealRecommendations(ids: string[] | null) {
     setMealIds(ids);
-    setShowAllCandidates(false);
+    setIsAiViewOpen(true);
     setFilters({ broadcast: "", category: "" });
+    // 마커 클릭으로 남아 있던 목록 스크롤 목표를 지운다 — 그대로 두면 '처음부터'로 목록이 다시
+    // 그려질 때 그 카드로 scrollIntoView가 걸려 리스트 아래쪽으로 튀어 버린다.
+    setListScrollTarget(null);
     const first = activeRestaurants.find(r => r.id === ids?.[0]);
     setSelectedId(first?.id ?? null);
     if (first) setMapCenter({ lat: first.latitude, lng: first.longitude });
     setDetailId(null);
+    // '처음부터'(또는 되묻기)로 추천이 사라지면 플래너가 있는 맨 위로 돌아간다 — 답변 블록이
+    // 접히면서 스크롤 위치만 남아 목록 중간을 보게 되는 것을 막는다.
+    if (ids === null) scrollListToTop();
   }
 
   function handleMealSelect(id: string) {
@@ -354,8 +363,8 @@ function HomeContent() {
     ? result.restaurants.filter((r) => matchesFilters(r, filters)).length
     : 0;
   const noFilterMatches = hasActiveRouteFilter && result !== null && result.restaurants.length > 0 && filteredMatchCount === 0;
-  // AI 추천 ↔ 경로 전체 토글 버튼 표시 여부. 리스트 패널 상단에 sticky로 고정된다.
-  const showCandidateToggle = result !== null && !detailRestaurant && mealIds !== null;
+  // 'AI 추천 보기' ↔ '경로 전체 N곳 보기' 토글 표시 여부. 리스트 패널 상단에 sticky로 고정된다.
+  const showViewToggle = result !== null && !detailRestaurant;
 
   // main: 모바일은 overflow-x-clip — overflow-hidden은 스크롤 컨테이너로 취급되어 안쪽 sticky(토글 밴드)가
   // 뷰포트가 아니라 main에 붙어 버린다. 데스크톱은 사이드바 접힘 translate를 잘라내야 하므로 hidden 유지.
@@ -370,7 +379,7 @@ function HomeContent() {
           highlightedRestaurantId={selectedId}
           center={mapCenter}
           activeBroadcast={(result ? filters.broadcast : browseBroadcast) || null}
-          activeFilters={result && !isMealFocused ? filters : null}
+          activeFilters={result && !isAiViewOpen ? filters : null}
           onBoundsIdle={handleBoundsIdle}
           onMarkerClick={handleMarkerClick}
           onShowDetail={handleShowDetail}
@@ -560,7 +569,7 @@ function HomeContent() {
                 initialDestination={formDestination}
               />
             </div>
-            {isJourneyReady && !isMealFocused && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
+            {isJourneyReady && !isAiViewOpen && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
           </div>
         </div>
 
@@ -574,32 +583,34 @@ function HomeContent() {
 
         <div className="relative z-0 order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
           {/* sticky 토글 밴드가 있을 때는 scroll-padding을 줘서 scrollIntoView 대상이 밴드 아래에 가려지지 않게 한다. */}
-          <div ref={listScrollRef} className={`no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2${showCandidateToggle ? " sm:scroll-pt-[72px]" : ""}`}>
-            {result && <div className={detailRestaurant ? "hidden" : undefined}>
+          <div ref={listScrollRef} className={`no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2${showViewToggle ? " sm:scroll-pt-[72px]" : ""}`}>
+            {/* 리스트를 내려도 상단에 고정되는 토글 버튼 (모바일: 뷰포트 상단, 데스크톱: 패널 상단).
+                패널의 첫 자식이어야 한다 — sticky는 부모 박스 범위 안에서만 유지되므로 스크롤 컨테이너 직속에 둔다.
+                데스크톱에서 sticky 요소는 패널의 content box(패딩 안쪽)에 갇히므로 top-0이면 패딩 12px 띠
+                사이로 카드가 비친다 — 패딩(p-3, short:p-2)만큼 음수 top/-mt/-mx 로 끌어올리고 같은 값의
+                pt/px로 되돌려서, 고정됐을 때 배경이 패널 윗변까지 덮고 버튼 위치는 원래 패딩 위치에 놓인다.
+                모바일은 바깥 컨테이너의 p-4 만큼 -mx-4/px-4 로 화면 가로를 다 덮고 페이지 배경색을 깐다. */}
+            {showViewToggle && result && (
+              <div className="sticky top-0 z-10 -mx-4 bg-paper px-4 pt-3 pb-4 sm:-top-3 sm:-mx-3 sm:-mt-3 sm:bg-[#29201a] sm:px-3 sm:short:-top-2 sm:short:-mx-2 sm:short:-mt-2 sm:short:px-2 sm:short:pt-2">
+                <button type="button" onClick={() => { setIsAiViewOpen(value => !value); setFilters({ broadcast: "", category: "" }); }} className="w-full rounded-xl border border-white/15 px-3 py-2.5 text-sm text-[#ffb45a] hover:bg-white/5">
+                  {isAiViewOpen ? `경로 전체 ${result.restaurants.length}곳 보기` : "AI 추천 보기"}
+                </button>
+              </div>
+            )}
+            {/* 언마운트하지 않고 숨긴다 — 입력 중인 문장과 받아둔 추천을 목록 화면을 오가도 유지한다. */}
+            {result && <div className={detailRestaurant || !isAiViewOpen ? "hidden" : undefined}>
               <MealPlanner
                 key={result.meal_context_id ?? "legacy-route"}
                 contextId={result.meal_context_id}
                 restaurants={result.restaurants}
                 disabled={isLoading}
+                active={isAiViewOpen && !detailRestaurant}
                 selectedId={selectedId}
                 onRecommendations={handleMealRecommendations}
                 onSelect={handleMealSelect}
                 onDetail={handleShowDetail}
               />
             </div>}
-            {/* 리스트를 내려도 상단에 고정되는 토글 버튼 (모바일: 뷰포트 상단, 데스크톱: 패널 상단).
-                sticky는 부모 박스 범위 안에서만 유지되므로 MealPlanner 래퍼 밖, 스크롤 컨테이너 직속에 둔다.
-                데스크톱에서 sticky 요소는 패널의 content box(패딩 안쪽)에 갇히므로 top-0이면 패딩 12px 띠
-                사이로 카드가 비친다 — 패딩(p-3, short:p-2)만큼 음수 top/-mt/-mx 로 끌어올리고 같은 값의
-                pt/px로 되돌려서, 고정됐을 때 배경이 패널 윗변까지 덮고 버튼 위치는 원래 패딩 위치에 놓인다.
-                모바일은 바깥 컨테이너의 p-4 만큼 -mx-4/px-4 로 화면 가로를 다 덮고 페이지 배경색을 깐다. */}
-            {showCandidateToggle && result && (
-              <div className="sticky top-0 z-10 -mx-4 -mt-3 bg-paper px-4 pt-3 pb-4 sm:-top-3 sm:-mx-3 sm:bg-[#29201a] sm:px-3 sm:short:-top-2 sm:short:-mx-2 sm:short:-mt-2 sm:short:px-2 sm:short:pt-2">
-                <button type="button" onClick={() => { setShowAllCandidates(value => !value); setFilters({ broadcast: "", category: "" }); }} className="w-full rounded-xl border border-white/15 px-3 py-2.5 text-sm text-[#ffb45a] hover:bg-white/5">
-                  {showAllCandidates ? "AI 추천만 지도에서 보기" : `경로 전체 ${result.restaurants.length}곳 보기`}
-                </button>
-              </div>
-            )}
             {detailRestaurant ? (
               <RestaurantDetail restaurant={detailRestaurant} onBack={() => setDetailId(null)} />
             ) : result ? (
@@ -615,7 +626,7 @@ function HomeContent() {
                     이 조건에 맞는 곳이 없어요 — 경로 전체 결과를 보여드려요
                   </div>
                 )}
-                {!isMealFocused && <RestaurantList
+                {!isAiViewOpen && <RestaurantList
                   restaurants={result.restaurants}
                   selectedId={selectedId}
                   activeFilters={filters}

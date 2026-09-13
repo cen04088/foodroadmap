@@ -10,13 +10,15 @@ interface Props {
   contextId: string | undefined;
   restaurants: RestaurantResult[];
   disabled: boolean;
+  // 플래너 화면이 실제로 보이는지. 숨겨진 상태에서는 포커스를 잡지 않는다(display:none은 포커스가 안 된다).
+  active?: boolean;
   selectedId: string | null;
   onRecommendations: (ids: string[] | null) => void;
   onSelect: (id: string) => void;
   onDetail: (id: string) => void;
 }
 
-export default function MealPlanner({ contextId, restaurants, disabled, selectedId, onRecommendations, onSelect, onDetail }: Props) {
+export default function MealPlanner({ contextId, restaurants, disabled, active = true, selectedId, onRecommendations, onSelect, onDetail }: Props) {
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [answer, setAnswer] = useState<MealRecommendationResponse | null>(null);
@@ -30,14 +32,14 @@ export default function MealPlanner({ contextId, restaurants, disabled, selected
 
   useEffect(() => () => { controller.current?.abort(); }, []);
 
-  // 경로 결과가 뜨면 AI 입력창에 바로 포커스 — 추천 요청이 결과 화면의 첫 동작이 되게 한다.
+  // 'AI 추천 보기'로 플래너가 열리면 입력창에 바로 포커스 — 열자마자 조건을 말할 수 있게 한다.
   // 데스크톱만: 모바일은 키보드가 올라와 지도를 가리고 페이지가 입력창으로 튀어 오른다.
   // 답변이 이미 있으면 건드리지 않는다 — 추천 카드를 살피는 중에 포커스를 빼앗지 않도록.
   useEffect(() => {
-    if (busy || answer) return;
+    if (!active || busy || answer) return;
     if (!window.matchMedia("(min-width: 640px)").matches) return;
     inputRef.current?.focus({ preventScroll: true });
-  }, [contextId, busy, answer]);
+  }, [active, contextId, busy, answer]);
 
   async function submit(text: string) {
     if (busy || !contextId || !text.trim()) return;
