@@ -4,6 +4,7 @@ from sqlalchemy.pool import StaticPool
 from app.db import init_db, make_session_factory
 from app.models import Broadcast, Restaurant
 from app.repository import (
+    count_restaurants,
     list_all_restaurants,
     list_broadcasts_with_counts,
     query_candidate_restaurants,
@@ -230,3 +231,23 @@ def test_list_broadcasts_with_counts_omits_hidden_broadcast():
         by_name = {b["name"]: b["count"] for b in list_broadcasts_with_counts(session)}
         assert "동네한바퀴" not in by_name
         assert by_name["또간집"] == 2
+
+
+def test_count_restaurants_skips_missing_coordinates_and_hidden_only_restaurants():
+    session_factory = make_session_factory_in_memory()
+    with session_factory() as session:
+        ttoganjib = Broadcast(id="ttoganjib", name="또간집")
+        hidden = Broadcast(id="kimyoungchul", name="동네한바퀴")
+        only_hidden = Restaurant(id="only-hidden", name="OnlyHidden", latitude=37.55, longitude=127.05)
+        only_hidden.broadcasts.append(hidden)
+        shared = Restaurant(id="shared", name="Shared", latitude=37.55, longitude=127.05)
+        shared.broadcasts.extend([hidden, ttoganjib])
+        visible = Restaurant(id="visible", name="Visible", latitude=37.55, longitude=127.05)
+        visible.broadcasts.append(ttoganjib)
+        no_coords = Restaurant(id="no-coords", name="NoCoords", latitude=None, longitude=None)
+        no_coords.broadcasts.append(ttoganjib)
+        session.add_all([ttoganjib, hidden, only_hidden, shared, visible, no_coords])
+        session.commit()
+
+        assert count_restaurants(session) == 2
+

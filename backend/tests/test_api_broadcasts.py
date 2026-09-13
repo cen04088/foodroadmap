@@ -49,6 +49,7 @@ def test_get_broadcasts_returns_counts_of_restaurants_with_coordinates():
     body = response.json()
     by_slug = {b["slug"]: b for b in body["broadcasts"]}
     assert by_slug["ttoganjib"] == {"slug": "ttoganjib", "name": "또간집", "count": 1}
+    assert body["total_restaurants"] == 1
 
 
 def test_get_broadcasts_sets_cache_control_header():

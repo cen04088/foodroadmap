@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, fetchAllRestaurants, fetchBroadcasts, fetchRouteRestaurants } from "./api";
+import { ApiError, fetchAllRestaurants, fetchBroadcastOverview, fetchBroadcasts, fetchRouteRestaurants } from "./api";
 
 const FAKE_RESPONSE = {
   route: { total_distance_m: 15000, total_duration_sec: 1200, points: [] },
@@ -94,6 +94,26 @@ describe("fetchRouteRestaurants", () => {
 
     expect(caught).toBeInstanceOf(ApiError);
     expect((caught as ApiError).status).toBe(0);
+  });
+});
+
+describe("fetchBroadcastOverview", () => {
+  it("returns broadcasts together with the unique restaurant total", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        broadcasts: [{ slug: "ttoganjib", name: "또간집", count: 232 }],
+        total_restaurants: 3412,
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchBroadcastOverview("http://localhost:8000");
+
+    expect(result.total_restaurants).toBe(3412);
+    expect(result.broadcasts).toHaveLength(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("http://localhost:8000/api/broadcasts");
   });
 });
 

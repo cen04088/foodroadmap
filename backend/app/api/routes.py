@@ -22,6 +22,7 @@ from app.repository import (
     count_suggestions_from_ip_since,
     create_suggestion,
     list_all_restaurants,
+    count_restaurants,
     list_broadcasts_with_counts,
     visible_broadcast_names,
     list_suggestions,
@@ -110,7 +111,7 @@ def _serialize_restaurant(restaurant: Restaurant) -> dict:
 @router.get("/api/broadcasts")
 def get_broadcasts(response: Response, session: Session = Depends(get_session)):
     response.headers["Cache-Control"] = BROWSE_CACHE_CONTROL
-    return {"broadcasts": list_broadcasts_with_counts(session)}
+    return {"broadcasts": list_broadcasts_with_counts(session), "total_restaurants": count_restaurants(session)}
 
 
 @router.get("/api/restaurants")

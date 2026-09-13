@@ -107,6 +107,18 @@ def list_all_restaurants(
     return list(session.scalars(stmt).unique())
 
 
+def count_restaurants(session: Session) -> int:
+    """서비스에 보이는 식당 수 — 좌표가 있고, 숨긴 방송에만 나온 곳은 뺀다.
+
+    방송별 count 합계는 여러 방송에 나온 식당을 중복 세므로 첫 화면의 '총 N곳'에는 이 값을 쓴다.
+    """
+    stmt = select(func.count()).select_from(Restaurant).where(
+        Restaurant.latitude.is_not(None), Restaurant.longitude.is_not(None)
+    )
+    stmt = _without_hidden_only_restaurants(stmt)
+    return session.scalar(stmt) or 0
+
+
 def list_broadcasts_with_counts(session: Session) -> list[dict]:
     counts_subquery = (
         select(

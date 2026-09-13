@@ -148,6 +148,18 @@ export async function fetchRouteRestaurants(
   return fetchJson<RouteRestaurantsResponse>(`/api/route-restaurants?${query.toString()}`, baseUrl);
 }
 
+export interface BroadcastOverview {
+  broadcasts: BroadcastSummary[];
+  // 좌표가 있고 서비스에 보이는 식당의 고유 개수. 방송별 count 합계는 여러 방송에 나온 곳을 중복 센다.
+  total_restaurants: number;
+}
+
+export async function fetchBroadcastOverview(
+  baseUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
+): Promise<BroadcastOverview> {
+  return fetchJson<BroadcastOverview>("/api/broadcasts", baseUrl);
+}
+
 export async function fetchBroadcasts(
   baseUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
 ): Promise<BroadcastSummary[]> {
