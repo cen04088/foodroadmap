@@ -48,7 +48,9 @@ categories는 요청 업종에 해당하는 available_categories의 정확한 �
 요청 업종이 후보에 없으면 요청 문자열을 그대로 남긴다. 후보가 없다고 조건을 지우면 안 된다.
 broadcasts도 정확한 방송명을 선택하고, 후보에 없더라도 요청 방송명을 남긴다.
 menu_keywords는 명시한 메뉴 이름만 OR 조건으로 사용한다. '매운 음식' 같은 속성은 추측하지 말고 unverified에 넣는다.
-excluded_keywords는 제외 요청한 메뉴/업종 문자 키워드이며 알레르기 안전 보장이 아니다.
+'고기', '해물', '면'처럼 음식 범주 단어도 메뉴 이름처럼 그대로 넣는다. 서버가 대표 메뉴명으로 넓혀 검색한다.
+excluded_keywords는 제외 요청한 메뉴/업종/음식 범주 문자 키워드이며 알레르기 안전 보장이 아니다.
+'고기집 빼고', '해물은 싫어'처럼 범주로 말해도 그 단어('고기집', '해물')를 그대로 넣고 unverified에 넣지 않는다.
 가격은 메뉴 한 개의 상한이다. 2만원=20000. 총 일행 예산만 있으면 메뉴당 예산을 clarification으로 물어본다.
 target_minutes는 출발 이후 경로상 지점을 지나는 시간이다. '한 시간쯤'은 60, 시간 범위가 없으면 전후 30분.
 '30분~1시간'은 target_minutes=45, time_window_minutes=15. '1시간 이내'는 30,30.
@@ -105,8 +107,60 @@ def interpret_preferences(message: str, previous: MealPreferences | None, restau
         raise PlannerError(502, "AI가 조건을 읽지 못했어요. 식사 시간이나 메뉴를 조금 더 구체적으로 알려주세요.") from exc
 
 
+def _normalize(text: str) -> str:
+    return text.replace(" ", "").casefold()
+
+
 def _contains(text: str, keyword: str) -> bool:
-    return keyword.replace(" ", "").casefold() in text.replace(" ", "").casefold()
+    return _normalize(keyword) in _normalize(text)
+
+
+# 음식 범주 단어 → 실제 메뉴명에 나타나는 대표 키워드.
+# "고기집 빼줘"라고 하면 LLM은 '고기집'을 그대로 넘기는데, 메뉴명에는 '삼겹살'·'목살'만 있고
+# 업종은 '한식'이라 문자 검색이 고기집을 못 잡는다(남영돈이 추천된 이유). 범주 단어가 들어오면
+# 여기 목록으로 넓혀 검색한다. 어디까지나 이름 검색의 확장이지 재료 판별이 아니다.
+# 규칙: 별칭은 사용자 단어와 통째로 일치해야 확장한다('소고기'는 별칭이 아니라 그대로 검색).
+# 키워드는 두 글자 이상만 — '회'·'면' 같은 한 글자는 다른 단어에 붙어 오탐이 난다('닭'은 예외).
+FOOD_GROUPS: tuple[tuple[frozenset[str], tuple[str, ...]], ...] = (
+    (frozenset({"고기", "고기집", "고깃집", "고기류", "육류", "육고기", "고기요리", "고기구이"}), (
+        "고기", "삼겹", "오겹", "목살", "항정", "갈매기살", "가브리살", "갈비", "갈빗살", "등심", "안심",
+        "채끝", "살치살", "차돌", "부채살", "토시살", "우삼겹", "한우", "소고기", "쇠고기", "돼지", "돈육",
+        "생고기", "불고기", "제육", "육회", "곱창", "막창", "대창", "양대창", "특양", "스테이크", "수육",
+        "보쌈", "족발", "육전", "뒷고기", "껍데기",
+    )),
+    (frozenset({"닭", "치킨", "닭고기", "닭요리"}), (
+        "닭", "치킨", "삼계", "백숙", "찜닭", "통닭",
+    )),
+    (frozenset({"해물", "해산물", "생선", "수산물", "회", "생선회", "해물요리", "생선요리"}), (
+        "해물", "해산물", "생선", "조개", "새우", "오징어", "문어", "낙지", "쭈꾸미", "주꾸미", "대게", "꽃게",
+        "게장", "장어", "전복", "고등어", "갈치", "광어", "우럭", "연어", "참치", "초밥", "스시", "사시미",
+        "물회", "회덮밥", "생선회", "모듬회", "아구", "아귀", "대구탕", "매운탕", "해물탕", "멍게", "해삼",
+        "가리비", "홍합", "꼬막", "바지락", "코다리", "황태", "북어", "복어",
+    )),
+    (frozenset({"면", "면류", "면요리", "누들"}), (
+        "국수", "칼국수", "냉면", "라면", "라멘", "우동", "소바", "메밀", "짜장", "짬뽕", "파스타", "스파게티",
+        "쫄면", "막국수", "비빔면", "쌀국수", "콩국수", "울면", "기스면", "탕면", "볶음면", "야끼소바", "모밀",
+    )),
+)
+
+
+def expand_keywords(words: list[str]) -> list[str]:
+    """범주 단어는 대표 메뉴 키워드까지 넓히고, 그 외 단어는 그대로 둔다. 원래 단어는 항상 유지한다."""
+    expanded: list[str] = []
+    for word in words:
+        expanded.append(word)
+        key = _normalize(word)
+        for aliases, terms in FOOD_GROUPS:
+            if key in aliases:
+                expanded.extend(terms)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for word in expanded:
+        normalized = _normalize(word)
+        if normalized not in seen:
+            seen.add(normalized)
+            unique.append(word)
+    return unique
 
 
 def _is_extra_menu(name: str) -> bool:
@@ -124,11 +178,13 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
     if p.unverified:
         notes.append("확인하지 못한 조건: " + ", ".join(p.unverified) + ". 이 조건은 추천에 반영하지 못했어요.")
     if p.excluded_keywords:
-        notes.append("제외 조건은 등록된 이름·업종·메뉴의 문자 검색이에요. 실제 재료나 알레르기 안전은 확인할 수 없어요.")
+        notes.append("제외 조건은 등록된 이름·업종·메뉴의 문자 검색이에요. '고기집'처럼 범주로 말하면 삼겹살·갈비 같은 대표 메뉴 이름까지 넓혀 찾지만, 실제 재료나 알레르기 안전은 확인할 수 없어요.")
     common = {"preferences": p.model_dump(), "notes": notes}
     if p.clarification:
         return {**common, "reply": p.clarification, "recommendations": [], "matched_count": 0}
 
+    excluded = expand_keywords(p.excluded_keywords)
+    wanted = expand_keywords(p.menu_keywords)
     ranked = []
     for restaurant in restaurants:
         if p.categories and restaurant.get("category") not in p.categories:
@@ -137,14 +193,14 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
             continue
         all_menu = restaurant["menu"]
         searchable = " ".join([restaurant["name"], restaurant.get("category") or ""] + [m["name"] for m in all_menu])
-        if any(_contains(searchable, word) for word in p.excluded_keywords):
+        if any(_contains(searchable, word) for word in excluded):
             continue
         minutes = restaurant["cumulative_time_sec"] / 60
         if p.target_minutes is not None and abs(minutes - p.target_minutes) > p.time_window_minutes:
             continue
         menus = [m for m in all_menu if (
-            any(_contains(m["name"], k) for k in p.menu_keywords)
-            if p.menu_keywords else not _is_extra_menu(m["name"])
+            any(_contains(m["name"], k) for k in wanted)
+            if wanted else not _is_extra_menu(m["name"])
         )]
         if p.max_price_won is not None:
             menus = [m for m in menus if m["price_won"] is not None and 0 < m["price_won"] <= p.max_price_won]

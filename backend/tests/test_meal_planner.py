@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from app.meal_planner import MealPreferences, PlannerError, interpret_preferences, recommend_meal
+from app.meal_planner import MealPreferences, PlannerError, expand_keywords, interpret_preferences, recommend_meal
 
 
 def preferences(**changes):
@@ -120,3 +120,42 @@ def test_missing_key_and_timeout_are_actionable(monkeypatch):
     with pytest.raises(PlannerError) as caught:
         interpret_preferences("한식", None, [])
     assert caught.value.status == 504
+
+
+def meat_restaurant(id="meat"):
+    # 남영돈처럼 업종은 '한식', 메뉴명에는 '고기'라는 글자가 없는 고기집.
+    return restaurant(id, name="남영돈", menu=[
+        {"name": "삼겹살", "price_won": 17000, "is_representative": True},
+        {"name": "목살", "price_won": 17000, "is_representative": False},
+    ])
+
+
+def test_food_group_exclusion_expands_to_menu_names():
+    result = recommend_meal([meat_restaurant(), restaurant("noodles")], preferences(excluded_keywords=["고기집"]))
+    assert ids(result) == ["noodles"]
+    assert any("범주" in note for note in result["notes"])
+
+
+@pytest.mark.parametrize("word", ["고기", "고깃집", "육류", "고기 집"])
+def test_food_group_aliases_all_exclude_meat(word):
+    assert ids(recommend_meal([meat_restaurant()], preferences(excluded_keywords=[word]))) == []
+
+
+def test_specific_words_are_not_over_expanded():
+    # '소고기'는 범주 별칭이 아니라 그대로 검색한다 — 돼지고기집은 남는다.
+    assert ids(recommend_meal([meat_restaurant()], preferences(excluded_keywords=["소고기"]))) == ["meat"]
+    assert expand_keywords(["국수"]) == ["국수"]
+
+
+def test_food_group_menu_keyword_matches_specific_menus():
+    result = recommend_meal([meat_restaurant(), restaurant("noodles")], preferences(menu_keywords=["고기"]))
+    assert ids(result) == ["meat"]
+    assert result["recommendations"][0]["menu"]["name"] == "삼겹살"
+
+
+def test_expand_keywords_keeps_original_word_first_and_dedupes():
+    expanded = expand_keywords(["고기집", "삼겹"])
+    assert expanded[0] == "고기집"
+    assert "삼겹" in expanded
+    assert len(expanded) == len({w.replace(" ", "") for w in expanded})
+
