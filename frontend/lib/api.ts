@@ -30,8 +30,18 @@ export interface RestaurantResult extends RestaurantSummary {
   cumulative_time_sec: number;
 }
 
+export interface EndpointAdjustment {
+  lat: number;
+  lng: number;
+  // 0이면 좌표는 그대로 두고 교통 통제(유고) 정보만 제외해 계산했다는 뜻.
+  offset_m: number;
+  reason: string;
+}
+
 export interface RouteRestaurantsResponse {
   meal_context_id?: string;
+  // 출발/도착지 주변 도로 문제로 좌표를 가까운 도로 지점으로 옮겨 계산했을 때만 값이 채워진다.
+  adjustments?: { origin: EndpointAdjustment | null; destination: EndpointAdjustment | null };
   route: {
     total_distance_m: number;
     total_duration_sec: number;
@@ -125,10 +135,19 @@ async function fetchJson<T>(path: string, baseUrl: string): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, `요청 실패: ${response.status}`);
+    // 서버가 detail 문자열을 주면 그대로 살린다 — 경로 오류처럼 카카오가 준 사유를 사용자에게 보여줘야 한다.
+    const detail = await readDetail(response);
+    throw new ApiError(response.status, detail ?? `요청 실패: ${response.status}`);
   }
 
   return response.json() as Promise<T>;
+}
+
+async function readDetail(response: Response): Promise<string | null> {
+  if (typeof response.json !== "function") return null;
+  const data: unknown = await response.json().catch(() => null);
+  const detail = (data as { detail?: unknown } | null)?.detail;
+  return typeof detail === "string" && detail.trim() ? detail : null;
 }
 
 export async function fetchRouteRestaurants(

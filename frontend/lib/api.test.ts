@@ -80,6 +80,26 @@ describe("fetchRouteRestaurants", () => {
     expect((caught as ApiError).status).toBe(502);
   });
 
+  it("carries the server's detail string as the error message", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({ detail: "선택한 위치로는 자동차 경로를 찾을 수 없어요 (도착 지점 주변의 도로를 탐색할 수 없음). 다른 장소를 선택해보세요" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const params = { originLat: 0, originLng: 0, destinationLat: 0, destinationLng: 0 };
+    let caught: unknown;
+    try {
+      await fetchRouteRestaurants(params, "http://localhost:8000");
+    } catch (err) {
+      caught = err;
+    }
+
+    expect((caught as ApiError).status).toBe(422);
+    expect((caught as ApiError).message).toContain("도착 지점 주변의 도로를 탐색할 수 없음");
+  });
+
   it("throws ApiError with status 0 when the network request itself fails", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError("network down"));
     vi.stubGlobal("fetch", fetchMock);
