@@ -57,13 +57,17 @@ export default function SearchIntro({ onPickRoute, disabled = false }: SearchInt
               key={`${route.origin.label}-${route.destination.label}`}
               type="button"
               disabled={disabled}
+              aria-label={`${route.origin.label} → ${route.destination.label} · ${route.hint}`}
               onClick={() => onPickRoute(route.origin, route.destination)}
-              className="rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-[#ffb45a]/60 hover:bg-[#ffb45a]/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-w-0 flex-col items-start rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-[#ffb45a]/60 hover:bg-[#ffb45a]/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className="block text-sm font-semibold leading-snug text-[#fff7ed]">
-                {route.origin.label} <span className="text-[#a89c91]">→</span> {route.destination.label}
+              <span className="block text-xs leading-5 text-[#a89c91]">
+                {route.origin.label} <span aria-hidden="true">→</span>
               </span>
-              <span className="mt-0.5 block text-[11px] text-[#a89c91]">{route.hint}</span>
+              <span className="block break-keep text-sm font-semibold leading-snug text-[#fff7ed]">
+                {route.destination.label}
+              </span>
+              <span className="mt-auto block break-keep pt-1 text-[11px] text-[#a89c91]">{route.hint}</span>
             </button>
           ))}
         </div>
