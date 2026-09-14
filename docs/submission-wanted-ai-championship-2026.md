@@ -42,7 +42,7 @@
 - 프론트엔드: Next.js 16 (App Router), React 19, Tailwind CSS 4, 카카오맵 JavaScript SDK, Vitest
 - 백엔드: FastAPI, SQLAlchemy 2, PostgreSQL, 카카오모빌리티 Directions API, pytest
 - 배포: 프론트 `<호스팅>`, 백엔드 Railway
-- 자동 테스트: 백엔드 143개, 프론트 37개 (LLM 응답은 대역으로 검증)
+- 자동 테스트: 백엔드 165개, 프론트 39개 (LLM 응답은 대역으로 검증)
 
 ## 데이터 출처 · 윤리 · 한계
 

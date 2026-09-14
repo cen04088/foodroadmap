@@ -44,7 +44,10 @@ export default function SearchIntro({ onPickRoute, disabled = false }: SearchInt
   }, []);
 
   return (
-    <section aria-label="시작하기" className="flex h-full min-h-[200px] flex-col justify-center gap-5 px-1 py-2 sm:short:gap-3">
+    // justify-center 대신 안쪽 래퍼의 my-auto로 가운데 맞춘다 — 세로가 짧은 화면에서 내용이 패널보다 길어지면
+    // justify-center는 위아래를 똑같이 잘라 맨 위 라벨이 스크롤로도 닿지 않는 곳으로 밀려난다.
+    <section aria-label="시작하기" className="flex min-h-full flex-col px-1 py-2">
+      <div className="my-auto flex min-h-[200px] flex-col gap-5 sm:short:gap-3">
       <div>
         <p className="text-[11px] font-bold tracking-[0.15em] text-[#ffb45a]">바로 시작하기</p>
         <h2 className="mt-1 text-base font-bold text-[#fff7ed]">이런 길은 어떠세요?</h2>
@@ -83,6 +86,7 @@ export default function SearchIntro({ onPickRoute, disabled = false }: SearchInt
           {overview.programs}개 방송 프로그램 · {overview.restaurants.toLocaleString("ko-KR")}곳, 방송에 나온 곳만 모았어요
         </p>
       )}
+      </div>
     </section>
   );
 }

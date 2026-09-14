@@ -610,7 +610,7 @@ function HomeContent() {
 
         <div className="relative z-0 order-4 p-4 pt-0 sm:min-h-0 sm:flex-1 sm:overflow-hidden sm:p-0 sm:pointer-events-auto">
           {/* sticky 토글 밴드가 있을 때는 scroll-padding을 줘서 scrollIntoView 대상이 밴드 아래에 가려지지 않게 한다. */}
-          <div ref={listScrollRef} className={`no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2${showViewToggle ? " sm:scroll-pt-[72px]" : ""}`}>
+          <div ref={listScrollRef} className={`no-scrollbar sm:h-full sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-white/10 sm:bg-[#29201a]/95 sm:p-3 sm:shadow-xl sm:shadow-black/25 sm:backdrop-blur-xl sm:short:p-2 ${showViewToggle ? "sm:scroll-pt-[72px]" : ""}`}>
             {/* 리스트를 내려도 상단에 고정되는 토글 버튼 (모바일: 뷰포트 상단, 데스크톱: 패널 상단).
                 패널의 첫 자식이어야 한다 — sticky는 부모 박스 범위 안에서만 유지되므로 스크롤 컨테이너 직속에 둔다.
                 데스크톱에서 sticky 요소는 패널의 content box(패딩 안쪽)에 갇히므로 top-0이면 패딩 12px 띠
