@@ -1,3 +1,5 @@
+import type { KakaoSdk } from "../types/kakao";
+
 export interface PlaceResult {
   name: string;
   address: string;
@@ -5,10 +7,10 @@ export interface PlaceResult {
   lng: number;
 }
 
-export function searchPlaces(kakao: any, keyword: string): Promise<PlaceResult[]> {
+export function searchPlaces(kakao: KakaoSdk, keyword: string): Promise<PlaceResult[]> {
   return new Promise((resolve, reject) => {
     const places = new kakao.maps.services.Places();
-    places.keywordSearch(keyword, (data: any[], status: string) => {
+    places.keywordSearch(keyword, (data, status) => {
       if (status === kakao.maps.services.Status.OK) {
         resolve(
           data.map((item) => ({

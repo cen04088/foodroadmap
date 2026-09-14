@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { KakaoSdk } from "../types/kakao";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
 import { searchPlaces, type PlaceResult } from "../lib/kakaoPlaces";
 
@@ -37,7 +38,7 @@ function PlaceInput({
   const [selected, setSelected] = useState<SelectedPlace | null>(initialPlace ?? null);
   const [hasSearched, setHasSearched] = useState(false);
   const [sdkError, setSdkError] = useState(false);
-  const kakaoRef = useRef<any>(null);
+  const kakaoRef = useRef<KakaoSdk | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -66,6 +67,7 @@ function PlaceInput({
     }
 
     debounceRef.current = setTimeout(() => {
+      if (!kakaoRef.current) return;
       searchPlaces(kakaoRef.current, value)
         .then((results) => {
           setSuggestions(results);

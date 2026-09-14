@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
@@ -6,6 +7,15 @@ from app.api.main import app
 from app.api.routes import get_session
 from app.db import init_db, make_session_factory
 from app.models import Broadcast, MenuItem, Restaurant
+
+
+@pytest.mark.parametrize("origin", ["nan,127", "37,inf", "91,127", "37,181"])
+def test_invalid_coordinate_range_rejected_before_external_call(origin, monkeypatch):
+    def unexpected(*args, **kwargs):
+        pytest.fail("Invalid coordinates must not reach the route provider")
+    monkeypatch.setattr("app.api.routes.resolve_route", unexpected)
+    response = TestClient(app).get("/api/route-restaurants", params={"origin": origin, "destination": "37,127"})
+    assert response.status_code == 400
 
 # 실제 카카오모빌리티 API로 라이브 검증된 구조의 합성 응답 (test_kakao_directions.py의 FAKE_RESPONSE와 동일한 구조).
 FAKE_KAKAO_RESPONSE = {

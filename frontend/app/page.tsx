@@ -445,7 +445,7 @@ function HomeContent() {
           </button>
         </div>
         {showRefreshArea && (
-          <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 sm:top-24">
+          <div className="absolute left-1/2 top-16 z-10 -translate-x-1/2 sm:top-24">
             <button
               type="button"
               onClick={handleRefreshArea}
@@ -463,7 +463,7 @@ function HomeContent() {
           방송 드롭다운이 자기 z-20으로는 카드 밖으로 못 올라온다. 카드가 DOM에서 목록보다
           앞이라 순서를 안 정해주면 목록이 위에 그려져 펼친 드롭다운을 덮어버린다. */}
       <header ref={headerRef} className="pointer-events-none relative z-20 flex items-center justify-between bg-[#171310]/95 px-5 py-4 text-[#fff7ed] shadow-lg shadow-black/10 backdrop-blur-xl sm:absolute sm:inset-x-0 sm:top-0 sm:bg-[#171310]/85 sm:px-7">
-        <Link href="/" className="pointer-events-auto">
+        <Link href="/" className="pointer-events-auto shrink-0">
           {logoFailed ? (
             <span className="text-lg font-black tracking-tight text-[#fff7ed] sm:text-xl">
               맛집<span className="text-[#ff7a1a]">로드</span>
@@ -474,16 +474,16 @@ function HomeContent() {
               ref={logoRef}
               src="/logo.png"
               alt="맛집로드"
-              className="h-7 w-auto sm:h-8"
+              className="h-auto w-24 sm:h-8 sm:w-auto"
               onError={() => setLogoFailed(true)}
             />
           )}
         </Link>
-        <nav className="pointer-events-auto flex items-center gap-3 text-sm text-[#a89c91] sm:gap-4">
+        <nav className="pointer-events-auto flex items-center gap-2 whitespace-nowrap text-sm text-[#a89c91] sm:gap-4">
           <button
             type="button"
             onClick={() => setIsSavedViewOpen(true)}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-sm font-medium text-[#fff7ed] transition hover:bg-white/10"
+            className="flex items-center gap-1.5 rounded-full border border-white/10 px-2 py-1.5 text-xs font-medium text-[#fff7ed] transition hover:bg-white/10 sm:px-3 sm:text-sm"
           >
             저장한 곳
             {favorites.length > 0 && (
@@ -495,9 +495,11 @@ function HomeContent() {
           <button
             type="button"
             onClick={() => setIsListViewOpen(true)}
-            className="rounded-full bg-[#ff7a1a] px-4 py-1.5 text-sm font-bold text-[#171310] shadow-[0_4px_16px_-4px_rgba(255,122,26,0.6)] transition hover:bg-[#ffb45a]"
+            aria-label="맛집 목록 보기"
+            className="rounded-full bg-[#ff7a1a] px-3 py-1.5 text-xs font-bold text-[#171310] shadow-[0_4px_16px_-4px_rgba(255,122,26,0.6)] transition hover:bg-[#ffb45a] sm:px-4 sm:text-sm"
           >
-            🍽 맛집 목록 보기
+            <span className="sm:hidden">맛집 목록</span>
+            <span className="hidden sm:inline">🍽 맛집 목록 보기</span>
           </button>
         </nav>
       </header>

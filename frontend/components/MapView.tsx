@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { KakaoSdk, KakaoMap, KakaoOverlay, KakaoMarker } from "../types/kakao";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
 import { isFavorite, toggleFavorite } from "../lib/favorites";
 
@@ -85,14 +86,14 @@ export default function MapView({
   onShowDetail,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const kakaoRef = useRef<any>(null);
-  const polylineRef = useRef<any>(null);
-  const polylineCasingRef = useRef<any>(null);
-  const markersRef = useRef<Map<string, any>>(new Map());
+  const mapRef = useRef<KakaoMap | null>(null);
+  const kakaoRef = useRef<KakaoSdk | null>(null);
+  const polylineRef = useRef<KakaoOverlay | null>(null);
+  const polylineCasingRef = useRef<KakaoOverlay | null>(null);
+  const markersRef = useRef<Map<string, KakaoMarker>>(new Map());
   const markerMetaRef = useRef<Map<string, { color: string; letter: string; isDimmed: boolean }>>(new Map());
   const highlightedIdRef = useRef<string | null>(null);
-  const infoWindowRef = useRef<any>(null);
+  const infoWindowRef = useRef<KakaoOverlay | null>(null);
   const centerRef = useRef(center);
   const onMarkerClickRef = useRef(onMarkerClick);
   const onShowDetailRef = useRef(onShowDetail);
@@ -125,14 +126,14 @@ export default function MapView({
   // 카카오 오버레이는 순수 HTML 문자열이라 React 이벤트 핸들러를 못 붙인다 —
   // 말풍선 안 버튼들("자세히 보기", 저장, 닫기)의 onclick에서 호출할 전역 함수를 등록해둔다.
   useEffect(() => {
-    (window as any).__foodmapShowDetail = (id: string) => {
+    window.__foodmapShowDetail = (id: string) => {
       onShowDetailRef.current?.(id);
     };
-    (window as any).__foodmapCloseOverlay = () => {
+    window.__foodmapCloseOverlay = () => {
       infoWindowRef.current?.setMap(null);
       infoWindowRef.current = null;
     };
-    (window as any).__foodmapToggleFavorite = (id: string) => {
+    window.__foodmapToggleFavorite = (id: string) => {
       const restaurant = restaurantsRef.current.find((r) => r.id === id);
       if (!restaurant) return;
       const saved = toggleFavorite(restaurant);
@@ -145,9 +146,9 @@ export default function MapView({
       }
     };
     return () => {
-      delete (window as any).__foodmapShowDetail;
-      delete (window as any).__foodmapCloseOverlay;
-      delete (window as any).__foodmapToggleFavorite;
+      delete window.__foodmapShowDetail;
+      delete window.__foodmapCloseOverlay;
+      delete window.__foodmapToggleFavorite;
     };
   }, []);
 
@@ -199,7 +200,6 @@ export default function MapView({
       resizeObserver?.disconnect();
     };
     // 최초 마운트 시 한 번만 지도를 생성한다 — 이후 center 변경은 아래 별도 effect가 panTo로 처리한다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -293,13 +293,14 @@ export default function MapView({
         const detailButton = `<button type="button" onclick="window.__foodmapShowDetail && window.__foodmapShowDetail('${restaurant.id}')" style="margin-top:6px;padding:4px 10px;border-radius:9999px;border:1px solid #ff7a1a;background:transparent;color:#ff7a1a;font-family:'Pretendard Variable',Pretendard,sans-serif;font-size:12px;font-weight:700;cursor:pointer;">자세히 보기</button>`;
         // 카카오 InfoWindow는 자체 말풍선 배경(스킨)을 콘텐츠와 별도로 측정해서
         // 그리는데, 폰트 로딩 타이밍에 따라 실제 콘텐츠 높이와 어긋나 텍스트가
-        // 흰 박스 밖으로 잘리는 버그가 반복됐다 — CustomOverlay는 우리가 만든
-        // div 자체가 배경이라 이런 불일치가 구조적으로 생길 수 없다.
+        // 흰 박스 밖으로 잘리는 버그가 반복됐다 — CustomOverlay는 콘텐츠 자체를 배경으로 쓴다.
+        // 지도 SDK 부모의 white-space: nowrap이 상속되어도 긴 이름/방송명이 줄바꿈되도록
+        // 콘텐츠 루트에서 normal로 재설정한다. overflow-wrap만으로는 nowrap을 덮지 못한다.
         infoWindowRef.current = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(restaurant.latitude, restaurant.longitude),
           xAnchor: 0.5,
           yAnchor: 1.25,
-          content: `<div style="position:relative;box-sizing:border-box;width:210px;padding:10px 12px;background:#ffffff;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.2);font-family:'Pretendard Variable',Pretendard,sans-serif;overflow-wrap:break-word;word-break:break-word;">
+          content: `<div style="position:relative;box-sizing:border-box;width:210px;padding:10px 12px;background:#ffffff;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.2);font-family:'Pretendard Variable',Pretendard,sans-serif;white-space:normal;overflow-wrap:anywhere;word-break:normal;">
             ${closeButton}
             ${favoriteButton}
             <div style="padding-right:44px;font-size:12px;font-weight:700;">${topLine}</div>

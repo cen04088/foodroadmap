@@ -1,4 +1,5 @@
 import logging
+import math
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from threading import BoundedSemaphore
@@ -63,7 +64,10 @@ def get_session():
 def _parse_lat_lng(value: str) -> tuple[float, float]:
     try:
         lat_str, lng_str = value.split(",")
-        return float(lat_str), float(lng_str)
+        lat, lng = float(lat_str), float(lng_str)
+        if not math.isfinite(lat) or not math.isfinite(lng) or not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            raise ValueError("Coordinates out of range")
+        return lat, lng
     except (ValueError, AttributeError) as exc:
         raise HTTPException(status_code=400, detail=f"잘못된 좌표 형식입니다: {value}") from exc
 

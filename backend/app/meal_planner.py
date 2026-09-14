@@ -166,7 +166,12 @@ def expand_keywords(words: list[str]) -> list[str]:
 def _is_extra_menu(name: str) -> bool:
     # Do not qualify an expensive restaurant on a cheap soda or bowl of extra rice.
     # These are explicit name checks, not a claim to understand every menu's serving size.
-    return bool(re.search(r"^(공기밥|공깃밥|햇반|사리추가|면추가|소주|맥주|막걸리|콜라|사이다|음료수|음료|탄산수|생수)(?:$|[\s(（/0-9])", name.strip()))
+    normalized = re.sub(r"\s+", "", name).casefold()
+    # Actual menus include '사리 추가' and specialty liquor such as '능이주'.
+    # Normalize spacing before matching, and keep names explicit: a generic '주' suffix
+    # would wrongly reject meals containing place names such as 제주.
+    extras = r"공기밥|공깃밥|햇반|사리추가|면추가|볶음밥추가|계란찜|달걀찜|소주|맥주|막걸리|콜라|사이다|음료수|음료|탄산수|생수|능이주|인삼주|더덕주|복분자주|복분자|매실주|산사춘|청하|백세주|하이볼"
+    return bool(re.search(rf"^(?:{extras})(?:$|[\(（/0-9])", normalized))
 
 
 def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dict:

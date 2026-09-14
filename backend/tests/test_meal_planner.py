@@ -63,6 +63,17 @@ def test_cheap_drinks_or_extra_rice_do_not_qualify_a_meal_budget():
     assert ids(recommend_meal([restaurant(menu=menus)], preferences(max_price_won=20000))) == []
 
 
+@pytest.mark.parametrize("name", ["능이주", "사리 추가", "사리\t추가", "면 추가", "계란찜", "복분자주 (병)", "볶음밥 추가"])
+def test_live_audit_extra_menus_do_not_qualify_meal_budget(name):
+    menus = [{"name": "능이버섯전골", "price_won": 45000}, {"name": name, "price_won": 4000}]
+    assert ids(recommend_meal([restaurant(menu=menus)], preferences(max_price_won=20000))) == []
+
+
+@pytest.mark.parametrize("name", ["제주국수", "소주찜", "새우볶음밥", "볶음밥"])
+def test_extra_filter_keeps_actual_meal_names(name):
+    assert ids(recommend_meal([restaurant(menu=[{"name": name, "price_won": 12000}])], preferences(max_price_won=20000))) == ["a"]
+
+
 def test_top_three_price_order_and_unknown_price_last():
     result = recommend_meal([restaurant(str(i), price=price) for i, price in enumerate([None, 15000, 8000, 12000, 9000])], preferences(sort="price"))
     assert ids(result) == ["2", "4", "3"]
