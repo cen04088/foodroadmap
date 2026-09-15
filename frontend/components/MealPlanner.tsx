@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, fetchMealRecommendations, type MealRecommendationResponse, type RestaurantResult } from "../lib/api";
 
 const EXAMPLES = ["한 시간쯤 뒤, 한식으로 2만 원 이하", "가는 길에 국수 먹고 싶어", "가능한 일찍, 저렴한 메뉴로"];
-const FOLLOWUPS = ["30분 더 일찍", "더 저렴하게", "시간 상관없이"];
 
 interface Props {
   contextId: string | undefined;
@@ -16,9 +15,10 @@ interface Props {
   onRecommendations: (ids: string[] | null) => void;
   onSelect: (id: string) => void;
   onDetail: (id: string) => void;
+  onShowAll: () => void;
 }
 
-export default function MealPlanner({ contextId, restaurants, disabled, active = true, selectedId, onRecommendations, onSelect, onDetail }: Props) {
+export default function MealPlanner({ contextId, restaurants, disabled, active = true, selectedId, onRecommendations, onSelect, onDetail, onShowAll }: Props) {
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [answer, setAnswer] = useState<MealRecommendationResponse | null>(null);
@@ -83,9 +83,14 @@ export default function MealPlanner({ contextId, restaurants, disabled, active =
 
   const p = answer?.preferences;
   const chips = p ? [
-    ...(p.target_minutes !== null ? [`출발 ${p.target_minutes}분 후 ±${p.time_window_minutes}분`] : []),
-    ...(p.max_price_won !== null ? [`메뉴 ${p.max_price_won.toLocaleString()}원 이하`] : []),
-    ...p.categories, ...p.broadcasts, ...p.menu_keywords,
+    ...(p.min_minutes != null || p.max_minutes != null
+      ? [p.min_minutes != null && p.max_minutes != null ? `출발 후 ${p.min_minutes}~${p.max_minutes}분`
+        : p.max_minutes != null ? `출발 후 ${p.max_minutes}분 이내` : `출발 후 ${p.min_minutes}분 이후`]
+      : p.target_minutes !== null ? [`출발 ${p.target_minutes}분 후 ±${p.time_window_minutes}분`] : []),
+    ...(p.max_price_won !== null ? [`메뉴 ${p.max_price_won.toLocaleString()}원 ${p.price_exclusive ? "미만" : "이하"}`] : []),
+    ...p.categories, ...p.broadcasts,
+    ...(p.menu_match === "all" && p.menu_keywords.length ? [`${p.menu_keywords.join(" · ")} 모두`] : p.menu_keywords),
+    ...(p.excluded_broadcasts ?? []).map(k => `${k} 제외`),
     ...p.excluded_keywords.map(k => `${k} 제외`),
     ...(p.sort === "price" ? ["낮은 메뉴 가격순"] : p.sort === "earliest" ? ["일찍 지나는 순"] : []),
   ] : [];
@@ -138,9 +143,12 @@ export default function MealPlanner({ contextId, restaurants, disabled, active =
           <textarea id="meal-request" ref={inputRef} value={message} onChange={event => setMessage(event.target.value)} maxLength={1000} rows={2} disabled={busy} placeholder="예: 한 시간 뒤, 한식으로 2만 원 이하" className="w-full resize-y rounded-xl border border-white/15 bg-[#171310] px-3 py-2.5 text-sm leading-6 text-[#fff7ed] outline-none placeholder:text-[#8d8074] focus:border-[#ffb45a] disabled:opacity-50" />
           <button type="submit" disabled={busy || !message.trim()} className="mt-2 w-full rounded-xl bg-[#ffb45a] px-3 py-2.5 text-sm font-bold text-[#211a14] transition hover:bg-[#ffd19a] disabled:cursor-not-allowed disabled:opacity-40">{loading ? "식사 조건을 읽고 있어요…" : answer ? "조건 바꿔 추천받기" : "내 경로에서 추천받기"}</button>
         </form>
-        <div className="flex flex-wrap gap-1.5">
-          {(answer ? FOLLOWUPS : EXAMPLES).map(example => <button key={example} type="button" disabled={busy} onClick={() => void submit(example)} className="rounded-full border border-white/15 px-2.5 py-1.5 text-[11px] text-[#cabbad] hover:border-[#ffb45a]/60 hover:text-[#ffb45a] disabled:opacity-40">{example}</button>)}
-        </div>
+        {!answer && <div className="flex flex-wrap gap-1.5">
+          {EXAMPLES.map(example => <button key={example} type="button" disabled={busy} onClick={() => void submit(example)} className="rounded-full border border-white/15 px-2.5 py-1.5 text-[11px] text-[#cabbad] hover:border-[#ffb45a]/60 hover:text-[#ffb45a] disabled:opacity-40">{example}</button>)}
+        </div>}
+        <button type="button" onClick={onShowAll} className="w-full rounded-xl border border-white/15 px-3 py-2.5 text-sm text-[#ffb45a] transition hover:bg-white/5">
+          경로 전체 {restaurants.length}곳 보기
+        </button>
         {error && <p role="alert" className="rounded-lg bg-red-400/10 px-3 py-2 text-xs leading-5 text-red-200">{error}</p>}
         {!contextId && <p className="text-xs leading-5 text-[#bfb1a4]">AI 추천을 위한 경로 정보가 없어요. 경로를 다시 검색해주세요.</p>}
         {restaurants.length === 0 && <p className="text-xs leading-5 text-[#bfb1a4]">이 경로에는 추천할 방송 맛집이 없어요. 다른 경로를 검색해보세요.</p>}

@@ -81,7 +81,7 @@ def test_top_three_price_order_and_unknown_price_last():
 
 
 def test_unknown_conditions_are_disclosed_and_clarification_has_no_recommendations():
-    result = recommend_meal([restaurant()], preferences(unverified=["주차", "영업 중"]))
+    result = recommend_meal([restaurant()], preferences(categories=["한식"], unverified=["주차", "영업 중"]))
     assert "주차" in " ".join(result["notes"])
     assert "주차" not in " ".join(result["recommendations"][0]["reasons"])
     result = recommend_meal([restaurant()], preferences(clarification="출발 후 몇 분쯤인가요?"))
@@ -153,7 +153,7 @@ def test_food_group_aliases_all_exclude_meat(word):
 
 
 def test_specific_words_are_not_over_expanded():
-    # '소고기'는 범주 별칭이 아니라 그대로 검색한다 — 돼지고기집은 남는다.
+    # 소고기 범주를 넓혀도 돼지고기집은 남는다.
     assert ids(recommend_meal([meat_restaurant()], preferences(excluded_keywords=["소고기"]))) == ["meat"]
     assert expand_keywords(["국수"]) == ["국수"]
 

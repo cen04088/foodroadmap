@@ -51,6 +51,13 @@ export interface RouteRestaurantsResponse {
 }
 
 export interface MealPreferences {
+  min_minutes?: number | null;
+  max_minutes?: number | null;
+  price_exclusive?: boolean;
+  menu_match?: "any" | "all";
+  excluded_broadcasts?: string[];
+  required_unverified?: string[];
+  purpose?: "meal" | "snack";
   categories: string[];
   broadcasts: string[];
   menu_keywords: string[];

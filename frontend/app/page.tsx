@@ -391,7 +391,7 @@ function HomeContent() {
     return adjustment ? [adjustmentNotice(endpoint, adjustment)] : [];
   });
   // 'AI 추천 보기' ↔ '경로 전체 N곳 보기' 토글 표시 여부. 리스트 패널 상단에 sticky로 고정된다.
-  const showViewToggle = result !== null && !detailRestaurant;
+  const showViewToggle = result !== null && !detailRestaurant && !isAiViewOpen;
 
   // main: 모바일은 overflow-x-clip — overflow-hidden은 스크롤 컨테이너로 취급되어 안쪽 sticky(토글 밴드)가
   // 뷰포트가 아니라 main에 붙어 버린다. 데스크톱은 사이드바 접힘 translate를 잘라내야 하므로 hidden 유지.
@@ -631,6 +631,7 @@ function HomeContent() {
                 onRecommendations={handleMealRecommendations}
                 onSelect={handleMealSelect}
                 onDetail={handleShowDetail}
+                onShowAll={() => { setIsAiViewOpen(false); setFilters({ broadcast: "", category: "" }); scrollListToTop(); }}
               />
             </div>}
             {detailRestaurant ? (
