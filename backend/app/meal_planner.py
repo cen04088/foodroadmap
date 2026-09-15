@@ -48,6 +48,7 @@ categories는 요청 업종에 해당하는 available_categories의 정확한 �
 요청 업종이 후보에 없으면 요청 문자열을 그대로 남긴다. 후보가 없다고 조건을 지우면 안 된다.
 broadcasts도 정확한 방송명을 선택하고, 후보에 없더라도 요청 방송명을 남긴다.
 menu_keywords는 명시한 메뉴 이름만 OR 조건으로 사용한다. '매운 음식' 같은 속성은 추측하지 말고 unverified에 넣는다.
+사용자가 특정 메뉴명을 명시하면 이름을 그대로 보존한다. 생소하거나 존재하지 않을 것 같아도 익숙한 메뉴명으로 축약하거나 일부를 미확인 속성으로 분리하지 않는다.
 '고기', '해물', '면'처럼 음식 범주 단어도 메뉴 이름처럼 그대로 넣는다. 서버가 대표 메뉴명으로 넓혀 검색한다.
 excluded_keywords는 제외 요청한 메뉴/업종/음식 범주 문자 키워드이며 알레르기 안전 보장이 아니다.
 '고기집 빼고', '해물은 싫어'처럼 범주로 말해도 그 단어('고기집', '해물')를 그대로 넣고 unverified에 넣지 않는다.
@@ -108,10 +109,13 @@ def interpret_preferences(message: str, previous: MealPreferences | None, restau
 
 
 def _normalize(text: str) -> str:
-    return text.replace(" ", "").casefold()
+    return re.sub(r"\s+", "", text).casefold()
 
 
 def _contains(text: str, keyword: str) -> bool:
+    # Single-character dish names must not match unrelated words such as 육회/회관.
+    if _normalize(keyword) == "회":
+        return bool(re.search(r"(?:^|[\s(/])회(?:$|[\s(/0-9])", text))
     return _normalize(keyword) in _normalize(text)
 
 
@@ -126,16 +130,19 @@ FOOD_GROUPS: tuple[tuple[frozenset[str], tuple[str, ...]], ...] = (
         "고기", "삼겹", "오겹", "목살", "항정", "갈매기살", "가브리살", "갈비", "갈빗살", "등심", "안심",
         "채끝", "살치살", "차돌", "부채살", "토시살", "우삼겹", "한우", "소고기", "쇠고기", "돼지", "돈육",
         "생고기", "불고기", "제육", "육회", "곱창", "막창", "대창", "양대창", "특양", "스테이크", "수육",
-        "보쌈", "족발", "육전", "뒷고기", "껍데기",
+        "보쌈", "족발", "육전", "뒷고기", "껍데기", "닭", "치킨", "삼계", "백숙", "오리고기", "오리구이", "훈제오리", "양고기", "순대", "설렁탕", "곰탕", "똥집",
     )),
     (frozenset({"닭", "치킨", "닭고기", "닭요리"}), (
         "닭", "치킨", "삼계", "백숙", "찜닭", "통닭",
     )),
-    (frozenset({"해물", "해산물", "생선", "수산물", "회", "생선회", "해물요리", "생선요리"}), (
+    (frozenset({"회", "생선회", "횟집", "사시미"}), (
+        "회", "생선회", "모듬회", "모둠회", "활어회", "숙성회", "사시미", "광어회", "우럭회", "연어회", "참치회", "방어회", "도미회", "회덮밥", "물회",
+    )),
+    (frozenset({"해물", "해산물", "생선", "수산물", "해물요리", "생선요리"}), (
         "해물", "해산물", "생선", "조개", "새우", "오징어", "문어", "낙지", "쭈꾸미", "주꾸미", "대게", "꽃게",
         "게장", "장어", "전복", "고등어", "갈치", "광어", "우럭", "연어", "참치", "초밥", "스시", "사시미",
         "물회", "회덮밥", "생선회", "모듬회", "아구", "아귀", "대구탕", "매운탕", "해물탕", "멍게", "해삼",
-        "가리비", "홍합", "꼬막", "바지락", "코다리", "황태", "북어", "복어",
+        "가리비", "홍합", "꼬막", "바지락", "코다리", "황태", "북어", "복어", "생굴", "석화", "굴국", "굴전", "굴찜", "굴튀김", "굴무침", "굴보쌈", "굴밥",
     )),
     (frozenset({"면", "면류", "면요리", "누들"}), (
         "국수", "칼국수", "냉면", "라면", "라멘", "우동", "소바", "메밀", "짜장", "짬뽕", "파스타", "스파게티",
@@ -167,6 +174,11 @@ def _is_extra_menu(name: str) -> bool:
     # Do not qualify an expensive restaurant on a cheap soda or bowl of extra rice.
     # These are explicit name checks, not a claim to understand every menu's serving size.
     normalized = re.sub(r"\s+", "", name).casefold()
+    # Add-ons may be suffixes, prefixes, or annotations, not just '사리 추가'.
+    if re.search(r"추가(?:$|[\(（,，/0-9])|[\(（](?:추가|후식)", normalized):
+        return True
+    if re.search(r"^(?:(?:라면|우동|국수|당면|떡|치즈|쫄면)사리|사리(?:떡|면)?|계란|달걀|삶은계란|삶은달걀)(?:$|[\(（/0-9])", normalized):
+        return True
     # Actual menus include '사리 추가' and specialty liquor such as '능이주'.
     # Normalize spacing before matching, and keep names explicit: a generic '주' suffix
     # would wrongly reject meals containing place names such as 제주.
@@ -190,6 +202,7 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
 
     excluded = expand_keywords(p.excluded_keywords)
     wanted = expand_keywords(p.menu_keywords)
+    explicitly_wants_extra = any(_is_extra_menu(k) for k in p.menu_keywords)
     ranked = []
     for restaurant in restaurants:
         if p.categories and restaurant.get("category") not in p.categories:
@@ -203,10 +216,9 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
         minutes = restaurant["cumulative_time_sec"] / 60
         if p.target_minutes is not None and abs(minutes - p.target_minutes) > p.time_window_minutes:
             continue
-        menus = [m for m in all_menu if (
-            any(_contains(m["name"], k) for k in wanted)
-            if wanted else not _is_extra_menu(m["name"])
-        )]
+        menus = [m for m in all_menu
+                 if (not wanted or any(_contains(m["name"], k) for k in wanted))
+                 and (explicitly_wants_extra or not _is_extra_menu(m["name"]))]
         if p.max_price_won is not None:
             menus = [m for m in menus if m["price_won"] is not None and 0 < m["price_won"] <= p.max_price_won]
         # Keyword and price must match the SAME menu item; unknown price never passes a budget.
