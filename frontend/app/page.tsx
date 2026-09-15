@@ -518,29 +518,22 @@ function HomeContent() {
         />
       )}
 
-      {/* 사이드바 접기/펼치기 손잡이 — 데스크톱 전용. 화면 세로 중앙에 혼자 떠 있으면
-          지도 위에 붕 뜬 요소처럼 보여서, 패널 상단 모서리에 붙여 패널의 일부처럼
-          보이게 한다. top 값은 패널을 감싸는 아래 div와 동일하게 맞춰 붙어 보이게 한다.
-          접으면 자기 위치만큼 왼쪽으로 이동해 화면 왼쪽 가장자리에 남는다 — 패널과
-          함께 translate로 움직이므로 두 요소가 같은 속도로 붙어서 미끄러진다. */}
-      <button
-        type="button"
-        onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
-        aria-expanded={!isSidebarCollapsed}
-        aria-label={isSidebarCollapsed ? "검색 패널 펼치기" : "검색 패널 접기"}
-        className={`hidden sm:absolute sm:left-[calc(var(--sidebar-gap)+var(--sidebar-w))] sm:top-24 sm:z-10 sm:flex sm:h-12 sm:w-7 sm:items-center sm:justify-center sm:rounded-r-xl sm:border sm:border-l-0 sm:border-white/10 sm:bg-[#171310]/95 sm:text-[#a89c91] sm:shadow-xl sm:shadow-black/30 sm:backdrop-blur-xl sm:transition sm:duration-300 sm:hover:text-[#fff7ed] sm:short:top-[84px] ${
-          isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-gap)+var(--sidebar-w))]" : ""
-        }`}
-      >
-        <Chevron className={`h-4 w-4 ${isSidebarCollapsed ? "-rotate-90" : "rotate-90"}`} />
-      </button>
-
       <div
         className={`contents sm:pointer-events-none sm:absolute sm:bottom-[var(--sidebar-gap)] sm:left-[var(--sidebar-gap)] sm:top-20 sm:z-10 sm:flex sm:w-[var(--sidebar-w)] sm:flex-col sm:gap-3 sm:transition-transform sm:duration-300 sm:short:top-[68px] sm:short:gap-2 ${
           isSidebarCollapsed ? "sm:-translate-x-[calc(var(--sidebar-w)+var(--sidebar-gap))]" : ""
         }`}
       >
         <div className="relative z-20 order-1 shrink-0 p-4 pb-0 sm:pointer-events-auto sm:p-0">
+          {/* 손잡이를 검색 카드에 붙여 카드 높이와 패널 이동에 함께 따라가게 한다. */}
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+            aria-expanded={!isSidebarCollapsed}
+            aria-label={isSidebarCollapsed ? "검색 패널 펼치기" : "검색 패널 접기"}
+            className="hidden sm:absolute sm:left-full sm:top-3 sm:-ml-px sm:flex sm:h-8 sm:w-7 sm:items-center sm:justify-center sm:rounded-r-xl sm:border sm:border-l-0 sm:border-white/10 sm:bg-[#29201a]/95 sm:text-[#a89c91] sm:shadow-xl sm:shadow-black/30 sm:backdrop-blur-xl sm:transition-colors sm:hover:text-[#fff7ed]"
+          >
+            <Chevron className={`h-4 w-4 ${isSidebarCollapsed ? "-rotate-90" : "rotate-90"}`} />
+          </button>
           <div className="rounded-2xl border border-white/10 bg-[#29201a]/95 p-5 shadow-xl shadow-black/25 backdrop-blur-xl sm:short:p-4">
             {isSearchCardCollapsed && (
               <button
