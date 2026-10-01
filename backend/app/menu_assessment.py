@@ -18,9 +18,9 @@ def suggest_assessment(name: str) -> dict:
     elif re.search(r"^(?:맛계란|후라이|계란후라이|공기밥|공깃밥|곱배기|곱빼기|마무리볶음밥)(?:$|[0-9(（])|사리|추가|후식"
                    r"|^(?:오이|죽순|짜사이|자차이|단무지|김치|깍두기)(?:무침|샐러드|볶음)?$", normalized):
         kind = "extra"
-    elif re.search(r"도넛|도너츠|꽈배기|쥐포|^고구마$|^알쌈$", normalized):
+    elif re.search(r"도넛|도너츠|꽈배기|쥐포|^고구마$|^알쌈$|^(?:쏘세지|소세지|소시지|닭꼬치)(?:$|[0-9(（])", normalized):
         kind = "snack"
-    elif re.search(r"국수|냉면|국밥|해장국|덮밥|돈까스|돈가스|파스타|비빔밥|정식|떡국|짬뽕", normalized):
+    elif re.search(r"국수|냉면|국밥|해장국|덮밥|돈까스|돈가스|파스타|비빔밥|정식|떡국|짬뽕|김밥|만둣국|만두국", normalized):
         kind = "meal"
     return {"kind": kind, "standalone": "unknown", "status": "unverified",
             "source": "name_rule", "evidence": f"메뉴명 기반 분류 제안: {name}"}

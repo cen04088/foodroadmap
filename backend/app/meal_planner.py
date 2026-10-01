@@ -258,8 +258,9 @@ def _menu_matches(menu: dict, word: str) -> bool:
     return any(_contains(menu["name"], term) for term in expand_keywords([word]))
 
 
-# 이보다 싼 메뉴는 이름으로 분류되지 않아도 한 끼가 아닐 가능성이 높다 (고구마 700원, 죽순 1,900원 등).
-MIN_UNREVIEWED_MEAL_PRICE_WON = 3000
+# 이 값 이하의 메뉴는 이름으로 분류되지 않으면 한 끼가 아닐 가능성이 높다 (고구마 700원, 죽순 1,900원,
+# 닭갈비집 볶음밥 3,000원 등). 김밥처럼 싼 한 끼는 이름 규칙(meal)으로 통과시킨다.
+MAX_UNREVIEWED_SIDE_PRICE_WON = 3000
 
 
 def _is_unit_priced(name: str) -> bool:
@@ -282,7 +283,7 @@ def _eligible_menu(menu: dict, p: MealPreferences) -> bool:
         if assessment.get("kind") in {"drink", "extra", "snack"} or _is_unit_priced(menu["name"]):
             return False
         price = menu.get("price_won")
-        return assessment.get("kind") == "meal" or not (price and 0 < price < MIN_UNREVIEWED_MEAL_PRICE_WON)
+        return assessment.get("kind") == "meal" or not (price and 0 < price <= MAX_UNREVIEWED_SIDE_PRICE_WON)
     # A specific dish can be looked up without pretending its serving size was checked.
     if assessment.get("standalone") == "no" and is_verified(assessment):
         return any(_normalize(menu["name"]) == _normalize(k) for k in p.menu_keywords)

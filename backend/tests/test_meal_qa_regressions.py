@@ -22,7 +22,7 @@ def test_unreviewed_meals_are_still_recommended_without_reviews():
 
 @pytest.mark.parametrize("name,price", [
     ("콜라, 사이다", 2000), ("맛계란", 1500), ("마라탕100g", 1650), ("죽순", 1900),
-    ("고구마", 700), ("오이 샐러드", 9000), ("볶음밥", 2000),
+    ("고구마", 700), ("오이 샐러드", 9000), ("볶음밥", 3000), ("쏘세지", 3000), ("닭꼬치", 3000),
 ])
 def test_unreviewed_non_meals_do_not_win_a_cheap_meal_request(name, price):
     rows = [unreviewed("side", name, price), unreviewed("meal", "김밥", 3000)]
