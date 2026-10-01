@@ -58,6 +58,22 @@ class Broadcast(Base):
     )
 
 
+class MenuAssessment(Base):
+    """Kept independently of menu row IDs, which change during recrawling."""
+
+    __tablename__ = "menu_assessments"
+
+    restaurant_id = Column(String, ForeignKey("restaurants.id"), primary_key=True)
+    menu_name = Column(String, primary_key=True)
+    kind = Column(String, nullable=False, default="unknown")
+    standalone = Column(String, nullable=False, default="unknown")
+    status = Column(String, nullable=False, default="unverified")
+    source = Column(String, nullable=False, default="name_rule")
+    evidence = Column(Text, nullable=False, default="")
+    reviewed_by = Column(String, nullable=True)
+    updated_at = Column(DateTime, nullable=False)
+
+
 class Suggestion(Base):
     """사용자가 보낸 개선 의견과 방송/유튜버 추가 요청.
 

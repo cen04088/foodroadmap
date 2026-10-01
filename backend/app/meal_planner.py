@@ -8,6 +8,9 @@ from typing import Annotated, Literal
 import requests
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.menu_assessment import is_verified, suggest_assessment
+from app.meal_places import merge_meal_places
+
 ShortText = Annotated[str, Field(min_length=1, max_length=80)]
 
 
@@ -32,6 +35,8 @@ class MealPreferences(BaseModel):
     excluded_broadcasts: list[ShortText] = Field(default_factory=list, max_length=10)
     required_unverified: list[ShortText] = Field(default_factory=list, max_length=10)
     purpose: Literal["meal", "snack"] = "meal"
+    min_price_won: int | None = Field(default=None, ge=0, le=1000000)
+    min_price_exclusive: bool = False
 
 
 class MealRequest(BaseModel):
@@ -62,7 +67,6 @@ excluded_keywords는 제외 요청한 메뉴/업종/음식 범주 문자 키워�
 '고기집 빼고', '해물은 싫어'처럼 범주로 말해도 그 단어('고기집', '해물')를 그대로 넣고 unverified에 넣지 않는다.
 가격은 메뉴 한 개의 상한이다. 2만원=20000. 총 일행 예산만 있으면 메뉴당 예산을 clarification으로 물어본다.
 target_minutes는 출발 이후 경로상 지점을 지나는 시간이다. '한 시간쯤'은 60, 시간 범위가 없으면 전후 30분.
-'30분~1시간'은 target_minutes=45, time_window_minutes=15. '1시간 이내'는 30,30.
 '더 일찍'은 이전 target_minutes에서 30분 빼고(최소 0) sort=timing; 이전 시간이 없으면 sort=earliest.
 '더 저렴하게'는 명시 가격이 없으면 기존 예산을 유지하고 sort=price. 가격을 임의로 낮추지 않는다.
 '예산 제한 없이'는 max_price_won=null. '시간 상관없이'는 target_minutes=null.
@@ -72,13 +76,37 @@ target_minutes는 출발 이후 경로상 지점을 지나는 시간이다. '한
 식당 정보 질문이나 무관한 요청은 식사 시간/메뉴/가격 조건을 요청하는 clarification을 반환한다.
 다른 조건을 검사할 수 있으면 unverified만 채우고 clarification은 null로 둔다.
 다음 규칙은 위 기본 시간 규칙보다 우선한다:
-min_minutes/max_minutes 기본값 null. '20분 이내'는 min_minutes=0,max_minutes=20,target_minutes=null. '2시간 이후'는 min_minutes=120,max_minutes=null,target_minutes=null. '30분~1시간'은 min_minutes=30,max_minutes=60,target_minutes=null. 이내/이후/구간을 전후 오차 범위로 바꾸지 않는다.
+min_minutes/max_minutes 기본값 null. '20분 이내'는 min_minutes=0,max_minutes=20,target_minutes=null. '2시간 이후'는 min_minutes=120,max_minutes=null,target_minutes=null. '30분~1시간'은 min_minutes=30,max_minutes=60,target_minutes=null. 'N 안에', 'N 내로', 'within N', 'in under N'도 이내다(min_minutes=0,max_minutes=N). 'N 뒤쯤', 'in about N', 'around N'만 target_minutes를 쓴다. 이내/이후/구간을 전후 오차 범위로 바꾸지 않는다.
 '한 시간쯤 뒤'는 min_minutes/max_minutes=null,target_minutes=60,time_window_minutes=30. 새 시간 요청은 기존 범위와 목표 시간을 함께 재설정한다. 시간 해제는 세 필드 모두 null. 범위에서 N분 더 일찍/늦게는 양 끝을 N분 이동하고 0 미만은 0으로 한다. 숫자가 없으면 30분 이동한다. 시간 변경이 아니면 기존 범위를 보존한다.
 가격 '미만'은 price_exclusive=true, '이하'는 false. 예산 해제는 price_exclusive=false. 1만원 미만은 max_price_won=10000,price_exclusive=true. 가격이 변경되지 않으면 비교 조건도 보존한다.
 방송 제외는 excluded_broadcasts에 정확한 방송명을 넣는다. unverified나 excluded_keywords에 넣지 않는다. 방송 제외 해제는 해당 배열에서 제거한다.
-required_unverified는 반드시 충족해야 하지만 검증할 수 없는 조건이다. '주차 가능한 곳만', '반드시', 알레르기 안전 요청 등은 unverified와 required_unverified 양쪽에 넣는다. 다른 메뉴/시간 조건이 있어도 필수 조건을 무시하지 않는다. 사용자가 그 조건을 해제하면 양쪽 배열에서 제거한다. 모든 미확인 조건을 해제하면 양쪽 모두 빈 배열이다. 되묻기에 답한 경우 이전 clarification을 지운다.
+required_unverified는 반드시 충족해야 하지만 검증할 수 없는 조건이다. '주차 가능한 곳만', '반드시', 알레르기 안전 요청 등은 unverified와 required_unverified 양쪽에 넣는다. 다른 메뉴/시간 조건이 있어도 필수 조건을 무시하지 않는다. 사용자가 그 조건을 해제하면 양쪽 배열에서 제거한다. 모든 미확인 조건을 해제하면 양쪽 모두 빈 배열이다. previous에 required_unverified와 추천 보류 clarification이 있고 사용자가 메뉴·가격·시간·업종 조건으로 답하면, 직접 확인하겠다는 뜻이므로 그 조건을 required_unverified에서 빼고 unverified에만 남긴다. 되묻기에 답한 경우 이전 clarification을 지운다.
 purpose 기본 meal. 간식/디저트/커피/빵을 원하면 snack, 식사/한 끼를 원하면 meal. '쥐포'처럼 특정 메뉴를 직접 말한 경우 menu_keywords에 보존한다.
+가격 하한도 지원한다: '1만원 이상 2만원 이하'는 min_price_won=10000,min_price_exclusive=false,max_price_won=20000,price_exclusive=false. '1만원 초과'는 min_price_won=10000,min_price_exclusive=true. 하한을 무시하거나 미지원이라고 하지 않는다. 새 가격 범위 요청은 양 끝을 재설정한다. '예산 제한 없이'는 양 끝 null, 두 exclusive=false. 가격 변경이 아닌 요청은 양 끝과 비교 조건을 보존한다.
+'국수집', '냉면집', '돈까스집', '고깃집'처럼 음식명+집은 업종명이 아니라 메뉴/음식 범주다. 예: '국수집 추천'은 categories=[],menu_keywords=['국수']. 단, 정확히 available_categories에 있는 업종은 그 업종으로 처리한다. 재료가 없다는 보장은 검증 불가하므로 '고기 없는 음식만'처럼 재료 부재를 필수로 요청하면 required_unverified에도 넣는다.
 """
+
+
+def _searchable(p: MealPreferences) -> tuple:
+    return (p.categories, p.broadcasts, p.menu_keywords, p.excluded_keywords, p.excluded_broadcasts,
+            p.max_price_won, p.min_price_won, p.target_minutes, p.min_minutes, p.max_minutes, p.purpose)
+
+
+def _accept_hold_answer(previous: MealPreferences | None, parsed: MealPreferences) -> None:
+    """필수 미확인 조건으로 보류한 뒤 '메뉴·가격·시간으로 찾아볼까요?'에 조건으로 답하면 진행한다.
+
+    그대로 두면 사용자가 안내대로 답해도 계속 보류돼 빠져나갈 수 없다. 새 필수 조건이 추가된
+    경우는 동의가 아니므로 유지하고, 미확인 조건은 unverified에 남겨 응답 안내에 계속 드러낸다.
+    """
+    if not (previous and previous.required_unverified and previous.clarification and parsed.required_unverified):
+        return
+    if not set(parsed.required_unverified) <= set(previous.required_unverified):
+        return
+    if _searchable(parsed) == _searchable(previous):
+        return
+    parsed.unverified = list(dict.fromkeys(parsed.unverified + parsed.required_unverified))
+    parsed.required_unverified = []
+    parsed.clarification = None
 
 
 def interpret_preferences(message: str, previous: MealPreferences | None, restaurants: list[dict]) -> MealPreferences:
@@ -116,7 +144,18 @@ def interpret_preferences(message: str, previous: MealPreferences | None, restau
         if choice.get("finish_reason") != "stop":
             raise ValueError("Incomplete model response")
         output = choice["message"]["content"]
-        return MealPreferences.model_validate_json(output)
+        parsed = MealPreferences.model_validate_json(output)
+        # Known dish-shop aliases are not taxonomy categories. Do not erase unknown
+        # categories in general: an unsupported cuisine should still yield no match.
+        aliases = {"국수집": "국수", "국수": "국수", "냉면집": "냉면", "돈까스집": "돈까스", "고깃집": "고기", "고기집": "고기"}
+        for category in list(parsed.categories):
+            if category not in context["available_categories"] and category in aliases:
+                parsed.categories.remove(category)
+                word = aliases[category]
+                if word not in parsed.menu_keywords:
+                    parsed.menu_keywords.append(word)
+        _accept_hold_answer(previous, parsed)
+        return MealPreferences.model_validate(parsed.model_dump())
     except requests.Timeout as exc:
         raise PlannerError(504, "조건을 읽는 데 시간이 걸리고 있어요. 다시 시도해주세요.") from exc
     except (requests.RequestException, ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
@@ -219,21 +258,60 @@ def _menu_matches(menu: dict, word: str) -> bool:
     return any(_contains(menu["name"], term) for term in expand_keywords([word]))
 
 
+# 이보다 싼 메뉴는 이름으로 분류되지 않아도 한 끼가 아닐 가능성이 높다 (고구마 700원, 죽순 1,900원 등).
+MIN_UNREVIEWED_MEAL_PRICE_WON = 3000
+
+
+def _is_unit_priced(name: str) -> bool:
+    """'마라탕100g'처럼 무게·낱개 단가로 적힌 메뉴 — 가격이 한 끼 값이 아니다."""
+    normalized = _normalize(name)
+    grams = [int(g) for g in re.findall(r"(\d+)g", normalized)]
+    return any(g <= 100 for g in grams) or bool(re.search(r"(?:1|한)(?:개|조각|피스|알)(?:$|[\)）])|낱개|개당", normalized))
+
+
+def _eligible_menu(menu: dict, p: MealPreferences) -> bool:
+    assessment = menu.get("assessment") or suggest_assessment(menu["name"])
+    if not p.menu_keywords:
+        desired_kind = "snack" if p.purpose == "snack" else "meal"
+        if is_verified(assessment):
+            return assessment.get("kind") == desired_kind and assessment.get("standalone") == "yes"
+        # 검토된 메뉴만 쓰면 아직 검토 데이터가 없는 운영 DB에서 일반 추천이 전부 비어버린다.
+        # 검토 전 메뉴는 명백히 한 끼가 아닌 것만 빼고, 응답에 '분류 미확인'으로 드러낸다.
+        if p.purpose == "snack":
+            return assessment.get("kind") != "extra"
+        if assessment.get("kind") in {"drink", "extra", "snack"} or _is_unit_priced(menu["name"]):
+            return False
+        price = menu.get("price_won")
+        return assessment.get("kind") == "meal" or not (price and 0 < price < MIN_UNREVIEWED_MEAL_PRICE_WON)
+    # A specific dish can be looked up without pretending its serving size was checked.
+    if assessment.get("standalone") == "no" and is_verified(assessment):
+        return any(_normalize(menu["name"]) == _normalize(k) for k in p.menu_keywords)
+    if assessment.get("kind") in {"drink", "extra", "snack"}:
+        return any(_normalize(k) in _normalize(menu["name"])
+                   and suggest_assessment(k)["kind"] == assessment["kind"] for k in p.menu_keywords)
+    return True
+
+
 def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dict:
     p = preferences.model_copy(deep=True)
     if p.required_unverified:
         p.unverified = list(dict.fromkeys(p.unverified + p.required_unverified))
         p.clarification = "반드시 필요한 조건(" + ", ".join(p.required_unverified) + ")을 확인할 수 없어 추천을 보류했어요. 이 조건은 직접 확인하고 메뉴·가격·시간으로 찾아볼까요?"
     elif p.unverified and not any((p.categories, p.broadcasts, p.menu_keywords, p.excluded_keywords,
-                                  p.excluded_broadcasts, p.max_price_won is not None,
+                                  p.excluded_broadcasts, p.max_price_won is not None, p.min_price_won is not None,
                                   p.target_minutes is not None, p.min_minutes is not None,
                                   p.max_minutes is not None, p.purpose == "snack")):
         p.clarification = "요청하신 조건은 등록 정보로 확인할 수 없어요. 원하는 메뉴, 메뉴당 예산 또는 출발 후 식사 시간을 알려주세요."
     if p.min_minutes is not None and p.max_minutes is not None and p.min_minutes > p.max_minutes:
         p.clarification = "시간 범위의 시작이 끝보다 늦어요. 출발 후 몇 분부터 몇 분 사이인지 알려주세요."
+    if p.min_price_won is not None and p.max_price_won is not None and (
+        p.min_price_won > p.max_price_won or p.min_price_won == p.max_price_won and (p.min_price_exclusive or p.price_exclusive)
+    ):
+        p.clarification = "가격 범위가 서로 맞지 않아요. 메뉴 한 개의 최소·최대 가격을 다시 알려주세요."
     notes = [
         "시간은 출발 후 원래 경로에서 식당 근처를 지나는 예상 시점이며, 실제 우회·도착 시간은 포함하지 않아요.",
         "가격은 수집된 메뉴 한 개 기준이에요. 영업 여부와 최신 가격은 방문 전에 확인해주세요.",
+        "일반 추천에서는 음료·사리·추가 메뉴와 소량 단가 메뉴를 빼지만, 메뉴 분류는 이름 기준이라 모든 메뉴의 한 끼 분량을 보장하지 않아요.",
     ]
     if p.unverified:
         notes.append("확인하지 못한 조건: " + ", ".join(p.unverified) + ". 이 조건은 추천에 반영하지 못했어요.")
@@ -247,7 +325,7 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
     wanted = expand_keywords(p.menu_keywords)
     ranked = []
     place_keys = {}
-    for restaurant in restaurants:
+    for restaurant in merge_meal_places(restaurants):
         if p.categories and restaurant.get("category") not in p.categories:
             continue
         if p.broadcasts and not set(p.broadcasts).intersection(restaurant["broadcasts"]):
@@ -268,18 +346,20 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
             continue
         menus = [m for m in all_menu
                  if (not wanted or any(_contains(m["name"], k) for k in wanted))
+                 and _eligible_menu(m, p)
                  and (not _is_extra_menu(m["name"]) or any(_is_extra_menu(k) and _menu_matches(m, k) for k in p.menu_keywords))
                  and (p.purpose == "snack" or not _is_snack(m["name"]) or any(_menu_matches(m, k) for k in p.menu_keywords))
                  and _normalize(m["name"]) not in {"계절별변동", "시가", "가격문의"}]
         if p.max_price_won is not None:
             menus = [m for m in menus if m["price_won"] is not None and m["price_won"] > 0
                      and (m["price_won"] < p.max_price_won if p.price_exclusive else m["price_won"] <= p.max_price_won)]
+        if p.min_price_won is not None:
+            menus = [m for m in menus if m["price_won"] is not None and m["price_won"] > 0
+                     and (m["price_won"] > p.min_price_won if p.min_price_exclusive else m["price_won"] >= p.min_price_won)]
         if p.menu_match == "all" and any(not any(_menu_matches(m, word) for m in menus) for word in p.menu_keywords):
             continue
         # Keyword and price must match the SAME menu item; unknown price never passes a budget.
-        if (p.menu_keywords or p.max_price_won is not None) and not menus:
-            continue
-        if all_menu and not menus:
+        if not menus:
             continue
         priced = [m for m in menus if m["price_won"] is not None and m["price_won"] > 0]
         evidence_menu = min(priced, key=lambda m: (0 if p.sort == "price" else not m.get("is_representative", False), m["price_won"])) if priced else (menus[0] if menus else None)
@@ -297,6 +377,13 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
         if evidence_menu:
             suffix = f" · {evidence_menu['price_won']:,}원" if evidence_menu["price_won"] and evidence_menu["price_won"] > 0 else " · 가격 미확인"
             reasons.append(evidence_menu["name"] + suffix)
+            assessment = evidence_menu.get("assessment") or suggest_assessment(evidence_menu["name"])
+            if not is_verified(assessment):
+                reasons.append("메뉴 분류·단독 주문 가능 여부 미확인")
+            elif assessment.get("standalone") != "yes":
+                reasons.append("단독 주문 불가" if assessment.get("standalone") == "no" else "단독 주문 가능 여부 미확인")
+            else:
+                reasons.append("단독 주문 가능 여부 확인 · 최신 조건은 방문 전 확인해주세요")
         if p.menu_match == "all" and p.menu_keywords:
             witnesses = list(dict.fromkeys(next(m["name"] for m in menus if _menu_matches(m, word)) for word in p.menu_keywords))
             reasons.append("요청한 메뉴 모두 확인: " + ", ".join(witnesses))
@@ -316,6 +403,12 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
             unique.append(item)
             seen.add(key)
     selected = unique[:3]
+    last_minutes = max((r["cumulative_time_sec"] for r in restaurants), default=0) / 60
+    earliest_wanted = (p.min_minutes if p.min_minutes is not None
+                       else p.target_minutes - p.time_window_minutes if p.target_minutes is not None else None)
     reply = (f"확인 가능한 조건에 맞는 {len(unique)}곳 중 {len(selected)}곳을 골랐어요." if selected
+             else f"이 경로의 맛집은 출발 후 약 {round(last_minutes)}분 안에 모두 지나가요. 그보다 이른 시간으로 다시 알려주세요."
+             if restaurants and earliest_wanted is not None and earliest_wanted > last_minutes
+             else "지금 조건에 맞는 식사 메뉴가 없어요. 시간·예산을 넓히거나 원하는 메뉴를 직접 입력해보세요." if not p.menu_keywords
              else "지금 조건을 확인할 수 있는 맛집이 없어요. 시간 범위를 넓히거나 예산·메뉴 조건을 바꿔보세요.")
     return {**common, "reply": reply, "recommendations": selected, "matched_count": len(unique)}

@@ -88,6 +88,7 @@ export default function MealPlanner({ contextId, restaurants, disabled, active =
         : p.max_minutes != null ? `출발 후 ${p.max_minutes}분 이내` : `출발 후 ${p.min_minutes}분 이후`]
       : p.target_minutes !== null ? [`출발 ${p.target_minutes}분 후 ±${p.time_window_minutes}분`] : []),
     ...(p.max_price_won !== null ? [`메뉴 ${p.max_price_won.toLocaleString()}원 ${p.price_exclusive ? "미만" : "이하"}`] : []),
+    ...(p.min_price_won != null ? [`메뉴 ${p.min_price_won.toLocaleString()}원 ${p.min_price_exclusive ? "초과" : "이상"}`] : []),
     ...p.categories, ...p.broadcasts,
     ...(p.menu_match === "all" && p.menu_keywords.length ? [`${p.menu_keywords.join(" · ")} 모두`] : p.menu_keywords),
     ...(p.excluded_broadcasts ?? []).map(k => `${k} 제외`),

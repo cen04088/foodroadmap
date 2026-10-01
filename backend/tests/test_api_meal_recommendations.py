@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.api.main import app
 from app.api.routes import get_session
 from app.meal_context import CONTEXT_REQUEST_LIMIT, save_context, utcnow
-from app.models import MealRouteContext
+from app.models import MealRouteContext, MenuAssessment
 from tests.test_api_route_restaurants import make_test_session_factory, override_get_session_factory, seed, FAKE_KAKAO_RESPONSE
 from tests.test_meal_planner import preferences, restaurant
 
@@ -15,6 +15,7 @@ from tests.test_meal_planner import preferences, restaurant
 def setup(monkeypatch):
     factory = make_test_session_factory()
     with factory() as session:
+        session.add(MenuAssessment(restaurant_id="a", menu_name="잔치국수", kind="meal", standalone="yes", status="verified", source="manual", evidence="test fixture review", updated_at=utcnow()))
         token = save_context(session, [restaurant()])
     app.dependency_overrides[get_session] = override_get_session_factory(factory)
     monkeypatch.setattr("app.api.routes.interpret_preferences", lambda message, previous, candidates: preferences(max_price_won=20000))
@@ -64,6 +65,9 @@ def test_request_limit_is_enforced(setup):
 def test_route_search_creates_usable_context(setup, monkeypatch):
     client, factory, _ = setup
     seed(factory)
+    with factory() as session:
+        session.add(MenuAssessment(restaurant_id="near", menu_name="대표 메뉴", kind="meal", standalone="yes", status="verified", source="manual", evidence="test fixture review", updated_at=utcnow()))
+        session.commit()
     monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
     monkeypatch.setattr("app.api.routes.fetch_route", lambda *args: FAKE_KAKAO_RESPONSE)
     route = client.get("/api/route-restaurants", params={"origin": "37.5,127.0", "destination": "37.6,127.1"})

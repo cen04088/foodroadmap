@@ -16,12 +16,15 @@ def preferences(**changes):
 
 
 def restaurant(id="a", minutes=60, price=12000, **changes):
-    return {
+    row = {
         "id": id, "name": "테스트 국수집", "category": "한식", "broadcasts": ["또간집"],
         "cumulative_time_sec": minutes * 60, "distance_from_route_km": 0.4,
         "menu": [{"name": "잔치국수", "price_won": price, "is_representative": True}],
         **changes,
     }
+    # These fixtures represent reviewed menus; unreviewed cases explicitly override assessment.
+    row["menu"] = [{"assessment": {"kind": "meal", "standalone": "yes", "status": "verified", "source": "manual", "evidence": "test fixture review"}, **m} for m in row["menu"]]
+    return row
 
 
 def ids(result):

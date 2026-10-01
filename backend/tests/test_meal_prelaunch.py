@@ -35,6 +35,7 @@ def test_small_sides_do_not_become_a_meal_even_without_budget(name):
 
 def test_snack_and_explicit_dish_requests_still_work():
     rows = [restaurant(menu=[{"name": "쥐포", "price_won": 600}])]
+    rows[0]["menu"][0]["assessment"]["kind"] = "snack"
     assert ids(recommend_meal(rows, preferences(purpose="snack"))) == ["a"]
     assert ids(recommend_meal(rows, preferences(menu_keywords=["쥐포"]))) == ["a"]
 

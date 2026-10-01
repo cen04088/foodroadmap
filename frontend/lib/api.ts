@@ -51,6 +51,8 @@ export interface RouteRestaurantsResponse {
 }
 
 export interface MealPreferences {
+  min_price_won?: number | null;
+  min_price_exclusive?: boolean;
   min_minutes?: number | null;
   max_minutes?: number | null;
   price_exclusive?: boolean;

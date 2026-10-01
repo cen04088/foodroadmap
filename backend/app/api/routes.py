@@ -21,6 +21,7 @@ from app.kakao.route_fallback import resolve_route
 from app.matching import RestaurantMatch, match_restaurants_to_route
 from app.models import Restaurant
 from app.meal_context import consume_context, save_context
+from app.menu_assessment import attach_assessments, load_assessments
 from app.meal_planner import MealRequest, PlannerError, interpret_preferences, recommend_meal
 from app.repository import (
     count_suggestions_from_ip_since,
@@ -217,6 +218,7 @@ def post_meal_recommendations(payload: MealRequest, response: Response, session:
         raise HTTPException(429, detail="AI 요청이 많아요. 잠시 후 다시 시도해주세요.")
     try:
         candidates = consume_context(session, payload.route_context_id)
+        candidates = attach_assessments(candidates, load_assessments(session, [r["id"] for r in candidates]))
         preferences = interpret_preferences(payload.message, payload.previous, candidates)
         return recommend_meal(candidates, preferences)
     except PlannerError as exc:
