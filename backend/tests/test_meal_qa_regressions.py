@@ -70,3 +70,12 @@ def test_time_beyond_the_route_explains_where_the_route_ends():
     result = recommend_meal(rows, preferences(min_minutes=300))
     assert result["recommendations"] == []
     assert "출발 후 약 190분 안에" in result["reply"]
+
+
+def test_cafe_bread_and_notice_rows_stay_out_of_general_meal_picks():
+    bread = unreviewed("cafe", "소금빵", 3500)
+    bread["category"] = "카페"
+    notice = unreviewed("notice", "8시 이후 워크인 방문 단품주문가능", 3500)
+    rows = [bread, notice, unreviewed("meal", "김밥", 4000)]
+    assert ids(recommend_meal(rows, preferences(sort="price"))) == ["meal"]
+    assert ids(recommend_meal([bread], preferences(categories=["카페"]))) == ["cafe"]

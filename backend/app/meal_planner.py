@@ -263,6 +263,10 @@ def _menu_matches(menu: dict, word: str) -> bool:
 MAX_UNREVIEWED_SIDE_PRICE_WON = 3000
 
 
+# 크롤링된 메뉴 목록에 섞인 안내 문구('8시 이후 워크인 방문 단품주문가능' 등) — 메뉴가 아니다.
+_NOTICE_MENU = re.compile(r"주문가능|워크인|방문시|이후방문|가격문의|문의바람")
+
+
 def _is_unit_priced(name: str) -> bool:
     """'마라탕100g'처럼 무게·낱개 단가로 적힌 메뉴 — 가격이 한 끼 값이 아니다."""
     normalized = _normalize(name)
@@ -329,6 +333,10 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
     for restaurant in merge_meal_places(restaurants):
         if p.categories and restaurant.get("category") not in p.categories:
             continue
+        # 일반 식사 요청에 카페 빵·음료가 '싼 한 끼'로 끼어들지 않게 한다. 카페를 직접 고르거나
+        # 메뉴를 말하면(빵으로 한 끼 등) 그대로 찾는다.
+        if p.purpose == "meal" and not p.categories and not p.menu_keywords and restaurant.get("category") == "카페":
+            continue
         if p.broadcasts and not set(p.broadcasts).intersection(restaurant["broadcasts"]):
             continue
         if set(p.excluded_broadcasts).intersection(restaurant["broadcasts"]):
@@ -350,7 +358,8 @@ def recommend_meal(restaurants: list[dict], preferences: MealPreferences) -> dic
                  and _eligible_menu(m, p)
                  and (not _is_extra_menu(m["name"]) or any(_is_extra_menu(k) and _menu_matches(m, k) for k in p.menu_keywords))
                  and (p.purpose == "snack" or not _is_snack(m["name"]) or any(_menu_matches(m, k) for k in p.menu_keywords))
-                 and _normalize(m["name"]) not in {"계절별변동", "시가", "가격문의"}]
+                 and _normalize(m["name"]) not in {"계절별변동", "시가", "가격문의"}
+                 and not _NOTICE_MENU.search(_normalize(m["name"]))]
         if p.max_price_won is not None:
             menus = [m for m in menus if m["price_won"] is not None and m["price_won"] > 0
                      and (m["price_won"] < p.max_price_won if p.price_exclusive else m["price_won"] <= p.max_price_won)]
