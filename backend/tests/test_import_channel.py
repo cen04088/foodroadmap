@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-from app.crawler.import_channel import import_channel
+from app.crawler.import_channel import import_channel, main
 from app.db import init_db, make_session_factory
 from app.models import Broadcast, Restaurant
 
@@ -74,3 +74,10 @@ def test_bundled_channel_files_are_well_formed(name):
     for r in data["restaurants"]:
         assert r["name"] and 33 < r["latitude"] < 39 and 124 < r["longitude"] < 132
         assert r["category"] in {"한식", "중식", "일식", "양식", "카페", "술집", "아시안", "기타"}
+
+
+def test_cli_refuses_to_guess_the_target_database(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr("sys.argv", ["import_channel", str(DATA_DIR / "yooxicman.json"), "--write"])
+    with pytest.raises(SystemExit):
+        main()

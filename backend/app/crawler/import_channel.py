@@ -8,6 +8,7 @@ python -m app.crawler.import_channel data/channels/dudley.json [--write]
 """
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 
@@ -88,6 +89,10 @@ def main():
     parser.add_argument("file")
     parser.add_argument("--write", action="store_true", help="DB에 반영한다 (없으면 확인만 하고 롤백)")
     args = parser.parse_args()
+    # railway ssh 셸에는 서버의 환경변수가 없다. 그대로 실행하면 기본값인 로컬 sqlite 파일에
+    # 조용히 써버리고 운영 DB는 그대로라, 대상 DB를 명시하지 않으면 멈춘다.
+    if not os.environ.get("DATABASE_URL"):
+        parser.error("DATABASE_URL이 설정되지 않았습니다 — 대상 DB를 명시해서 실행하세요")
     data = json.loads(Path(args.file).read_text(encoding="utf-8"))
     engine = make_engine()
     try:
