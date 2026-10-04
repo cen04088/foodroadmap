@@ -1,26 +1,17 @@
 "use client";
 
 import BroadcastDropdown from "./BroadcastDropdown";
+import { BROADCAST_COLORS } from "../lib/broadcastColors";
 
 export interface Filters {
   broadcast: string;
   category: string;
 }
 
+// 방송 색 목록이 곧 서비스에 노출하는 방송 목록이다 — 따로 적어두면 새 방송을 추가할 때 필터만 빠진다.
 export const BROADCASTS: { value: string; label: string }[] = [
   { value: "", label: "전체" },
-  { value: "또간집", label: "또간집" },
-  { value: "흑백요리사", label: "흑백요리사" },
-  { value: "쯔양", label: "쯔양" },
-  { value: "먹을텐데", label: "먹을텐데" },
-  { value: "전현무계획", label: "전현무계획" },
-  { value: "허영만의 백반기행", label: "허영만의 백반기행" },
-  { value: "한국인의 밥상", label: "한국인의 밥상" },
-  { value: "맛있는 녀석들", label: "맛있는 녀석들" },
-  { value: "백년가게", label: "백년가게" },
-  { value: "비밀이야", label: "비밀이야" },
-  { value: "공간 탐닉", label: "공간 탐닉" },
-  { value: "김사원세끼", label: "김사원세끼" },
+  ...Object.keys(BROADCAST_COLORS).map((name) => ({ value: name, label: name })),
 ];
 
 export interface FilterBarProps {
