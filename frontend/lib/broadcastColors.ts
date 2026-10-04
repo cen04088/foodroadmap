@@ -16,6 +16,8 @@ export const BROADCAST_COLORS: Record<string, BroadcastColor> = {
   비밀이야: { color: "#4F46E5", letter: "비" },
   "공간 탐닉": { color: "#0284C7", letter: "공" },
   김사원세끼: { color: "#16A34A", letter: "김" },
+  더들리: { color: "#1E3A8A", letter: "더" },
+  육식맨: { color: "#B91C1C", letter: "육" },
 };
 
 export const DEFAULT_BROADCAST_COLOR: BroadcastColor = { color: "#78716C", letter: "?" };

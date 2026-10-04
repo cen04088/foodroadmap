@@ -11,6 +11,8 @@ export const BROADCAST_IMAGES: Record<string, string> = {
   흑백요리사: "/broadcasts/heukbaek.jpg",
   먹을텐데: "/broadcasts/meogeulteonde.jpg",
   "공간 탐닉": "/broadcasts/tamnik.jpg",
+  더들리: "/broadcasts/dudley.jpg",
+  육식맨: "/broadcasts/yooxicman.jpg",
 };
 
 export function getBroadcastImage(name: string): string | null {
