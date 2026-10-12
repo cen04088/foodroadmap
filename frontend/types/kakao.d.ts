@@ -24,6 +24,15 @@ export interface KakaoPlace {
   y: string;
 }
 
+// Geocoder.addressSearch 결과. 지번만 있는 주소면 road_address가 null, 도로명만 매칭되면 address가 null일 수 있다.
+export interface KakaoAddress {
+  address_name: string;
+  x: string;
+  y: string;
+  road_address: { address_name: string; building_name: string } | null;
+  address: { address_name: string } | null;
+}
+
 export interface KakaoSdk {
   maps: {
     load(callback: () => void): void;
@@ -38,6 +47,7 @@ export interface KakaoSdk {
     event: { addListener(target: KakaoMap | KakaoMarker, type: string, callback: () => void): void };
     services: {
       Places: new () => { keywordSearch(keyword: string, callback: (data: KakaoPlace[], status: string) => void): void };
+      Geocoder: new () => { addressSearch(query: string, callback: (data: KakaoAddress[], status: string) => void): void };
       Status: { OK: string; ZERO_RESULT: string };
     };
   };
