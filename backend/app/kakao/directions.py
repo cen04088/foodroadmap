@@ -1,3 +1,5 @@
+from typing import Iterable
+
 import requests
 
 from app.geo import haversine_km
@@ -59,54 +61,64 @@ def parse_route_summary(response: dict) -> dict:
 def parse_route_points(response: dict) -> list[dict]:
     route = _first_route(response)
 
+    def roads():
+        for section in route.get("sections", []):
+            for road in section.get("roads", []):
+                vertexes = road.get("vertexes") or []
+                coords = list(zip(vertexes[0::2], vertexes[1::2]))  # (lng, lat) pairs
+                yield coords, road.get("distance", 0), road.get("duration", 0)
+
+    return build_route_points(roads())
+
+
+def build_route_points(pieces: Iterable[tuple[list[tuple[float, float]], float, float]]) -> list[dict]:
+    """(좌표 [(lng, lat)...], 그 조각의 거리 m, 소요 시간 초) 조각들을 이어 경로 점마다 누적 거리·시간을 매긴다.
+
+    한 조각의 소요 시간은 조각 안 좌표들에 거리 비례로 나눠 준다. 자동차(도로 단위)와 도보·자전거(안내 단계 단위)
+    응답이 모양만 다를 뿐 이 계산은 같아서 공유한다.
+    """
     points: list[dict] = []
     cumulative_distance_m = 0.0
     cumulative_time_sec = 0.0
 
-    for section in route.get("sections", []):
-        for road in section.get("roads", []):
-            vertexes = road.get("vertexes") or []
-            coords = list(zip(vertexes[0::2], vertexes[1::2]))  # (lng, lat) pairs
+    for coords, piece_distance_m, piece_duration_sec in pieces:
+        if len(coords) < 2:
+            # Degenerate piece with < 2 vertexes: skip point emission but still advance cumulative totals
+            cumulative_distance_m += piece_distance_m
+            cumulative_time_sec += piece_duration_sec
+            continue
 
-            road_duration_sec = road.get("duration", 0)
+        seg_lengths_m = []
+        for (lng1, lat1), (lng2, lat2) in zip(coords, coords[1:]):
+            seg_lengths_m.append(haversine_km(lat1, lng1, lat2, lng2) * 1000)
+        total_len_m = sum(seg_lengths_m)
 
-            if len(coords) < 2:
-                # Degenerate road with < 2 vertexes: skip point emission but still advance cumulative totals
-                cumulative_distance_m += road.get("distance", 0)
-                cumulative_time_sec += road_duration_sec
-                continue
+        if not points:
+            lng0, lat0 = coords[0]
+            points.append(
+                {
+                    "lat": lat0,
+                    "lng": lng0,
+                    "cumulative_distance_m": 0.0,
+                    "cumulative_time_sec": 0.0,
+                }
+            )
 
-            seg_lengths_m = []
-            for (lng1, lat1), (lng2, lat2) in zip(coords, coords[1:]):
-                seg_lengths_m.append(haversine_km(lat1, lng1, lat2, lng2) * 1000)
-            total_len_m = sum(seg_lengths_m)
+        running_len_m = 0.0
+        for (lng, lat), seg_len_m in zip(coords[1:], seg_lengths_m):
+            running_len_m += seg_len_m
+            fraction = (running_len_m / total_len_m) if total_len_m > 0 else 1.0
+            points.append(
+                {
+                    "lat": lat,
+                    "lng": lng,
+                    "cumulative_distance_m": cumulative_distance_m + running_len_m,
+                    "cumulative_time_sec": cumulative_time_sec + fraction * piece_duration_sec,
+                }
+            )
 
-            if not points:
-                lng0, lat0 = coords[0]
-                points.append(
-                    {
-                        "lat": lat0,
-                        "lng": lng0,
-                        "cumulative_distance_m": 0.0,
-                        "cumulative_time_sec": 0.0,
-                    }
-                )
-
-            running_len_m = 0.0
-            for (lng, lat), seg_len_m in zip(coords[1:], seg_lengths_m):
-                running_len_m += seg_len_m
-                fraction = (running_len_m / total_len_m) if total_len_m > 0 else 1.0
-                points.append(
-                    {
-                        "lat": lat,
-                        "lng": lng,
-                        "cumulative_distance_m": cumulative_distance_m + running_len_m,
-                        "cumulative_time_sec": cumulative_time_sec + fraction * road_duration_sec,
-                    }
-                )
-
-            cumulative_distance_m += total_len_m
-            cumulative_time_sec += road_duration_sec
+        cumulative_distance_m += total_len_m
+        cumulative_time_sec += piece_duration_sec
 
     return points
 
