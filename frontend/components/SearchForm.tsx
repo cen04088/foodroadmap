@@ -102,8 +102,10 @@ function PlaceInput({
         className="w-full rounded-xl border border-white/10 bg-[#171310]/80 px-4 py-3 text-base text-[#fff7ed] sm:short:py-2 sm:short:text-sm placeholder:text-[#a89c91] outline-none transition focus:border-[#ff7a1a] focus:ring-4 focus:ring-[#ff7a1a]/15 disabled:bg-[#3a2a1e] disabled:text-[#a89c91]"
       />
       {sdkError && <p className="mt-1.5 text-xs text-ink-muted">장소 검색을 사용할 수 없어요</p>}
+      {/* 카카오 검색은 최대 15곳(+주소)을 돌려준다 — 높이를 묶고 안쪽 스크롤을 줘야 한다. 데스크톱은 화면 높이에
+          고정된 레이아웃이라 드롭다운이 화면 아래로 넘치면 잘려서 아래쪽 결과를 고를 수 없었다. */}
       {showDropdown && (
-        <div className="absolute z-10 mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-[#29201a] shadow-lg shadow-black/30">
+        <div className="absolute z-10 mt-2 max-h-[min(20rem,50vh)] w-full overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#29201a] shadow-lg shadow-black/30">
           {suggestions.length > 0 ? (
             <ul>
               {suggestions.map((s) => (
