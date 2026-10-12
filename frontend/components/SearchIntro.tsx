@@ -14,7 +14,7 @@ export const PRESET_ROUTES: { origin: SelectedPlace; destination: SelectedPlace;
 ];
 
 const STEPS = [
-  { title: "출발지와 목적지를 정하세요", body: "가는 길 반경 2km 안의 방송 맛집을 찾아요." },
+  { title: "출발지와 목적지를 정하세요", body: "가는 길 반경 2km(도보 500m·자전거 1km) 안의 방송 맛집을 찾아요." },
   { title: "출발 후 N분 순으로 확인", body: "지나가는 순서대로 목록과 지도에 표시돼요." },
   { title: "AI 추천 보기로 조건 말하기", body: "“한 시간 뒤 한식, 2만 원 이하”처럼 물어보세요." },
 ];

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import type { KakaoSdk } from "../types/kakao";
 import { loadKakaoMapsSdk } from "../lib/kakaoMap";
 import { searchPlaces, type PlaceResult } from "../lib/kakaoPlaces";
+import { TRAVEL_MODE_LABELS, type TravelMode } from "../lib/api";
+
+const TRAVEL_MODES: TravelMode[] = ["car", "walk", "bicycle"];
 
 export interface SelectedPlace {
   label: string;
@@ -22,6 +25,9 @@ export interface SearchFormProps {
   // 사용자가 어떤 경로를 보고 있는지 알 수 있고, 한쪽만 바꿔 다시 검색할 수 있다.
   initialOrigin?: SelectedPlace | null;
   initialDestination?: SelectedPlace | null;
+  // 이동수단은 부모가 들고 있는다 — 예시 경로 칩은 폼을 거치지 않고 자동차로 검색해야 해서.
+  mode: TravelMode;
+  onModeChange: (mode: TravelMode) => void;
 }
 
 function PlaceInput({
@@ -155,6 +161,8 @@ export default function SearchForm({
   isLoading,
   initialOrigin,
   initialDestination,
+  mode,
+  onModeChange,
 }: SearchFormProps) {
   const [origin, setOrigin] = useState<SelectedPlace | null>(initialOrigin ?? null);
   const [destination, setDestination] = useState<SelectedPlace | null>(initialDestination ?? null);
@@ -186,6 +194,26 @@ export default function SearchForm({
           </svg>
         </div>
         <PlaceInput label="어디까지 가시나요?" initialPlace={initialDestination} onSelect={handleDestinationSelect} />
+      </div>
+      <div
+        role="radiogroup"
+        aria-label="이동수단"
+        className="mt-1 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-[#171310]/80 p-1 sm:short:mt-0"
+      >
+        {TRAVEL_MODES.map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={mode === option}
+            onClick={() => onModeChange(option)}
+            className={`rounded-lg py-1.5 text-sm font-semibold transition sm:short:py-1 sm:short:text-xs ${
+              mode === option ? "bg-white/10 text-[#ffb45a]" : "text-[#a89c91] hover:text-[#fff7ed]"
+            }`}
+          >
+            {TRAVEL_MODE_LABELS[option]}
+          </button>
+        ))}
       </div>
       <button
         type="button"

@@ -345,3 +345,117 @@ def test_get_route_restaurants_returns_422_with_kakao_reason_for_any_nonzero_res
 
     assert response.status_code == 422
     assert "도착 지점 주변의 도로에 자동차 진입 불가" in response.json()["detail"]
+
+
+# 카카오맵 도보 경로 응답(test_kakao_routing.py의 FAKE_WALK_RESPONSE와 같은 구조). 자동차 테스트와 같은 직선 경로.
+FAKE_WALK_RESPONSE = {
+    "status": "OK",
+    "route": {
+        "properties": {"totalDistance": 15000, "totalTime": 12000},
+        "legs": [
+            {
+                "steps": [
+                    {
+                        "properties": {"distance": 15000, "time": 12000},
+                        "path": {"points": [[127.0, 37.5], [127.05, 37.55], [127.1, 37.6]]},
+                    }
+                ]
+            }
+        ],
+    },
+}
+
+
+def _get_with_seeded_db(params):
+    session_factory = make_test_session_factory()
+    seed(session_factory)
+    app.dependency_overrides[get_session] = override_get_session_factory(session_factory)
+    try:
+        return TestClient(app).get("/api/route-restaurants", params=params)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_walk_mode_uses_kakao_map_routing_with_a_walking_radius(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    calls = []
+
+    def fake_routing(mode, *args, **kwargs):
+        calls.append(mode)
+        return FAKE_WALK_RESPONSE
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("walk mode must not call the car directions API")
+
+    monkeypatch.setattr("app.api.routes.fetch_routing", fake_routing)
+    monkeypatch.setattr("app.api.routes.fetch_route", unexpected)
+
+    response = _get_with_seeded_db({"origin": "37.5,127.0", "destination": "37.6,127.1", "mode": "walk"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert calls == ["walk"]
+    assert body["mode"] == "walk"
+    assert body["radius_km"] == 0.5
+    assert body["route"]["total_duration_sec"] == 12000
+    assert body["adjustments"] == {"origin": None, "destination": None}
+    names = [r["name"] for r in body["restaurants"]]
+    # Medium(경로에서 ~1.5km)은 자동차 기본 반경 2km에는 들지만 도보 500m에는 안 든다.
+    assert "Near Restaurant" in names
+    assert "Medium Restaurant" not in names
+
+
+def test_bicycle_mode_defaults_to_one_km_and_explicit_radius_still_wins(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    monkeypatch.setattr("app.api.routes.fetch_routing", lambda *args, **kwargs: FAKE_WALK_RESPONSE)
+
+    default = _get_with_seeded_db({"origin": "37.5,127.0", "destination": "37.6,127.1", "mode": "bicycle"})
+    widened = _get_with_seeded_db({"origin": "37.5,127.0", "destination": "37.6,127.1", "mode": "bicycle", "radius_km": 3})
+
+    assert default.json()["radius_km"] == 1.0
+    assert widened.json()["radius_km"] == 3
+    assert "Medium Restaurant" in [r["name"] for r in widened.json()["restaurants"]]
+
+
+def test_car_mode_is_the_default_and_reports_its_radius(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    monkeypatch.setattr("app.api.routes.fetch_route", lambda *args, **kwargs: FAKE_KAKAO_RESPONSE)
+
+    response = _get_with_seeded_db({"origin": "37.5,127.0", "destination": "37.6,127.1"})
+
+    assert response.json()["mode"] == "car"
+    assert response.json()["radius_km"] == 2.0
+
+
+def test_walk_too_far_away_suggests_switching_to_car(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    monkeypatch.setattr("app.api.routes.fetch_routing", lambda *args, **kwargs: {"status": "TOO_FAR_AWAY"})
+
+    response = TestClient(app).get(
+        "/api/route-restaurants", params={"origin": "37.55,126.97", "destination": "37.76,128.90", "mode": "walk"}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "도보로 가기엔 너무 먼 거리예요. 자동차로 검색해보세요"
+
+
+def test_walk_route_failure_names_the_mode_and_reason(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    monkeypatch.setattr("app.api.routes.fetch_routing", lambda *args, **kwargs: {"status": "END_LINK_NOT_FOUND"})
+
+    response = TestClient(app).get(
+        "/api/route-restaurants", params={"origin": "37.5,127.0", "destination": "37.6,127.1", "mode": "walk"}
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "도보 경로를 찾을 수 없어요" in detail
+    assert "도착지 주변에서 길을 찾을 수 없어요" in detail
+
+
+def test_unknown_mode_is_rejected(monkeypatch):
+    monkeypatch.setenv("KAKAO_REST_API_KEY", "test-key")
+    response = TestClient(app).get(
+        "/api/route-restaurants", params={"origin": "37.5,127.0", "destination": "37.6,127.1", "mode": "train"}
+    )
+    assert response.status_code == 422

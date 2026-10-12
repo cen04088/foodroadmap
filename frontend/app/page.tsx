@@ -16,10 +16,12 @@ import {
   ApiError,
   fetchAllRestaurants,
   fetchRouteRestaurants,
+  TRAVEL_MODE_LABELS,
   type EndpointAdjustment,
   type MapBounds,
   type RestaurantSummary,
   type RouteRestaurantsResponse,
+  type TravelMode,
 } from "../lib/api";
 import { formatDuration } from "../lib/format";
 import { useFavorites, type FavoritePlace } from "../lib/favorites";
@@ -33,7 +35,7 @@ function errorMessageFor(error: unknown): string {
     // 422는 서버가 카카오의 사유("도착 지점 주변의 도로를 탐색할 수 없음" 등)를 detail에 실어 준다.
     // 스키마 검증 실패처럼 detail이 문자열이 아니면 기본 문구("요청 실패: 422")가 오므로 그때만 대체한다.
     if (error.status === 422) {
-      return error.message.startsWith("요청 실패") ? "선택한 위치 근처에서 자동차 경로를 찾을 수 없어요, 다른 장소를 선택해보세요" : error.message;
+      return error.message.startsWith("요청 실패") ? "선택한 위치로는 경로를 찾을 수 없어요, 다른 장소를 선택해보세요" : error.message;
     }
     return "요청 중 오류가 발생했습니다";
   }
@@ -70,6 +72,7 @@ function HomeContent() {
   // 검색 상태는 URL에 싣지 않는다 — 새로고침하면 항상 처음 화면(검색 전)으로 돌아간다.
   const [origin, setOrigin] = useState<SelectedPlace | null>(null);
   const [destination, setDestination] = useState<SelectedPlace | null>(null);
+  const [travelMode, setTravelMode] = useState<TravelMode>("car");
   const [filters, setFilters] = useState<Filters>({ broadcast: "", category: "" });
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
   // 경로 결과를 받은 시각 — "지금 출발하면" 기준으로 식사 시간대 구간을 나눈다.
@@ -244,7 +247,7 @@ function HomeContent() {
     !result && pendingBounds && viewBounds && roundedBoundsKey(pendingBounds) !== roundedBoundsKey(viewBounds)
   );
 
-  async function runSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace) {
+  async function runSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace, mode: TravelMode) {
     const seq = ++searchSeqRef.current;
     setIsLoading(true);
     setErrorMessage(null);
@@ -262,6 +265,7 @@ function HomeContent() {
         originLng: searchOrigin.lng,
         destinationLat: searchDestination.lat,
         destinationLng: searchDestination.lng,
+        mode,
       });
       if (seq !== searchSeqRef.current) return;
       setResult(response);
@@ -278,18 +282,20 @@ function HomeContent() {
     }
   }
 
-  function handleSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace) {
+  function handleSearch(searchOrigin: SelectedPlace, searchDestination: SelectedPlace, mode: TravelMode = travelMode) {
     setOrigin(searchOrigin);
     setDestination(searchDestination);
     setFormOrigin(searchOrigin);
     setFormDestination(searchDestination);
-    runSearch(searchOrigin, searchDestination);
+    runSearch(searchOrigin, searchDestination, mode);
   }
 
   // 첫 화면의 예시 경로 칩. 폼도 같은 값으로 다시 채워서(키 교체) 검색 카드를 펼쳤을 때 어긋나지 않게 한다.
+  // 예시 경로는 모두 도시 간 장거리라 자동차로 검색한다 — 도보로 두면 "너무 멀어요"로 끝난다.
   function handlePresetRoute(presetOrigin: SelectedPlace, presetDestination: SelectedPlace) {
     setFormSeedKey((key) => key + 1);
-    handleSearch(presetOrigin, presetDestination);
+    setTravelMode("car");
+    handleSearch(presetOrigin, presetDestination, "car");
   }
 
   function handleBackToMap() {
@@ -395,6 +401,8 @@ function HomeContent() {
   // 검색 후 부제에 쓰는 개수 — RestaurantList는 필터를 강조/흐림에만 쓰고 경로 후보
   // 전체를 그리므로, 이 값이 실제로 목록에 보이는 칸 수와 같다.
   const routeCount = result?.restaurants.length ?? 0;
+  // 자동차가 기본이라 그때는 안 쓰고, 도보·자전거일 때만 소요 시간 앞에 붙인다("도보 · 1시간 5분").
+  const resultModePrefix = result?.mode && result.mode !== "car" ? `${TRAVEL_MODE_LABELS[result.mode]} · ` : "";
   // 결과가 있을 때만 접을 수 있다 — 검색 전에 접히면 아무것도 할 수 없는 화면이 된다.
   const isSearchCardCollapsed = isJourneyReady && isSearchCollapsed;
   const hasActiveRouteFilter = Boolean(filters.broadcast || filters.category);
@@ -563,7 +571,7 @@ function HomeContent() {
                 </span>
                 {result && (
                   <span className="shrink-0 text-xs text-[#ffb45a]">
-                    {formatDuration(result.route.total_duration_sec)}
+                    {resultModePrefix}{formatDuration(result.route.total_duration_sec)}
                     {routeCount > 0 && ` · ${routeCount}곳`}
                   </span>
                 )}
@@ -605,6 +613,8 @@ function HomeContent() {
                 isLoading={isLoading}
                 initialOrigin={formOrigin}
                 initialDestination={formDestination}
+                mode={travelMode}
+                onModeChange={setTravelMode}
               />
             </div>
             {isJourneyReady && !isAiViewOpen && <><div className="my-4 border-t border-white/10 sm:short:my-3" /><FilterBar filters={filters} onChange={handleFiltersChange} /></>}
@@ -657,7 +667,7 @@ function HomeContent() {
                 {!isSearchCardCollapsed && (
                   <div className="mb-3 flex items-center justify-between px-1 pt-1 text-sm">
                     <span className="font-semibold text-[#fff7ed]">{origin?.label} <span className="text-[#a89c91]">→</span> {destination?.label}</span>
-                    <span className="text-xs text-[#ffb45a]">{formatDuration(result.route.total_duration_sec)}</span>
+                    <span className="text-xs text-[#ffb45a]">{resultModePrefix}{formatDuration(result.route.total_duration_sec)}</span>
                   </div>
                 )}
                 {adjustmentNotices.map((notice) => (

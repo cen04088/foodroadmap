@@ -43,6 +43,18 @@ describe("fetchRouteRestaurants", () => {
     expect(calledUrl.searchParams.get("radius_km")).toBe("3");
   });
 
+  it("sends mode only for non-car travel", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => FAKE_RESPONSE });
+    vi.stubGlobal("fetch", fetchMock);
+    const base = { originLat: 0, originLng: 0, destinationLat: 0, destinationLng: 0 };
+
+    await fetchRouteRestaurants({ ...base, mode: "walk" }, "http://localhost:8000");
+    await fetchRouteRestaurants({ ...base, mode: "car" }, "http://localhost:8000");
+
+    expect(new URL(fetchMock.mock.calls[0][0] as string).searchParams.get("mode")).toBe("walk");
+    expect(new URL(fetchMock.mock.calls[1][0] as string).searchParams.has("mode")).toBe(false);
+  });
+
   it("omits radius_km from the query string when not provided", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

@@ -39,6 +39,9 @@ export interface EndpointAdjustment {
 }
 
 export interface RouteRestaurantsResponse {
+  // 이전 백엔드는 두 필드를 보내지 않는다 — 없으면 자동차·2km로 본다.
+  mode?: TravelMode;
+  radius_km?: number;
   meal_context_id?: string;
   // 출발/도착지 주변 도로 문제로 좌표를 가까운 도로 지점으로 옮겨 계산했을 때만 값이 채워진다.
   adjustments?: { origin: EndpointAdjustment | null; destination: EndpointAdjustment | null };
@@ -127,7 +130,13 @@ export interface FetchRouteRestaurantsParams {
   broadcast?: string;
   category?: string;
   radiusKm?: number;
+  mode?: TravelMode;
 }
+
+// 자동차는 카카오모빌리티 길찾기, 도보·자전거는 카카오맵 경로 조회를 쓴다(백엔드). 매칭 반경도 이동수단마다 다르다.
+export type TravelMode = "car" | "walk" | "bicycle";
+
+export const TRAVEL_MODE_LABELS: Record<TravelMode, string> = { car: "자동차", walk: "도보", bicycle: "자전거" };
 
 export interface BroadcastSummary {
   slug: string;
@@ -172,6 +181,8 @@ export async function fetchRouteRestaurants(
   // 반경은 프론트에서 안 보내고 백엔드 기본값(2km)에 맡긴다 — 사용자가 고르는 UI를
   // 없앴으므로 기본값을 양쪽에 중복해두지 않는다. 파라미터 자체는 남겨둔다.
   if (params.radiusKm) query.set("radius_km", String(params.radiusKm));
+  // 자동차는 백엔드 기본값이라 보내지 않는다 — mode를 모르는 이전 백엔드에도 그대로 통한다.
+  if (params.mode && params.mode !== "car") query.set("mode", params.mode);
 
   return fetchJson<RouteRestaurantsResponse>(`/api/route-restaurants?${query.toString()}`, baseUrl);
 }

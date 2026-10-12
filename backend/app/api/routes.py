@@ -3,6 +3,7 @@ import math
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from threading import BoundedSemaphore
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
@@ -18,6 +19,7 @@ from app.db import make_engine, make_session_factory
 from app.geo import bounding_box_with_margin, downsample_route_points
 from app.kakao.directions import KakaoDirectionsError, KakaoRouteError, fetch_route, parse_route_points, parse_route_summary
 from app.kakao.route_fallback import resolve_route
+from app.kakao.routing import KakaoRoutingStatusError, fetch_routing, parse_routing_points, parse_routing_summary
 from app.matching import RestaurantMatch, match_restaurants_to_route
 from app.models import Restaurant
 from app.meal_context import consume_context, save_context
@@ -39,6 +41,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 DEFAULT_RADIUS_KM = 2.0
+# 이동수단별 기본 매칭 반경. 걸어서 2km(25분)를 돌아가진 않는다 — 도보 500m는 왕복 우회 15분 남짓, 자전거는 1km.
+DEFAULT_RADIUS_KM_BY_MODE = {"car": DEFAULT_RADIUS_KM, "walk": 0.5, "bicycle": 1.0}
+MODE_LABELS = {"car": "자동차", "walk": "도보", "bicycle": "자전거"}
+TravelMode = Literal["car", "walk", "bicycle"]
 MENU_DISPLAY_LIMIT = 3
 # 크롤러를 수동으로 다시 돌릴 때만 바뀌는 데이터라, 몇 분간 캐싱해도 최신성에 문제없다.
 BROWSE_CACHE_CONTROL = "public, max-age=300"
@@ -148,7 +154,9 @@ def get_route_restaurants(
     response: Response,
     origin: str = Query(..., description="lat,lng"),
     destination: str = Query(..., description="lat,lng"),
-    radius_km: float = Query(DEFAULT_RADIUS_KM, gt=0, le=50),
+    # 주지 않으면 이동수단별 기본값(DEFAULT_RADIUS_KM_BY_MODE)을 쓴다.
+    radius_km: float | None = Query(None, gt=0, le=50),
+    mode: TravelMode = Query("car"),
     broadcast: str | None = Query(None),
     category: str | None = Query(None),
     session: Session = Depends(get_session),
@@ -156,6 +164,7 @@ def get_route_restaurants(
     response.headers["Cache-Control"] = "no-store"
     origin_lat, origin_lng = _parse_lat_lng(origin)
     dest_lat, dest_lng = _parse_lat_lng(destination)
+    radius = radius_km if radius_km is not None else DEFAULT_RADIUS_KM_BY_MODE[mode]
 
     try:
         api_key = get_kakao_api_key()
@@ -163,33 +172,45 @@ def get_route_restaurants(
         raise HTTPException(status_code=500, detail="서버 설정 오류: 카카오 API 키가 설정되지 않았습니다") from exc
 
     try:
-        # 출발/도착지 주변 도로 문제면 가까운 도로 지점으로 옮겨 다시 시도한다 — 보정 내역은 응답에 실어 화면에 알린다.
-        raw_response, adjustments = resolve_route(origin_lat, origin_lng, dest_lat, dest_lng, api_key, fetch=fetch_route)
-        route_points = parse_route_points(raw_response)
-        route_summary = parse_route_summary(raw_response)
+        if mode == "car":
+            # 출발/도착지 주변 도로 문제면 가까운 도로 지점으로 옮겨 다시 시도한다 — 보정 내역은 응답에 실어 화면에 알린다.
+            raw_response, adjustments = resolve_route(origin_lat, origin_lng, dest_lat, dest_lng, api_key, fetch=fetch_route)
+            route_points = parse_route_points(raw_response)
+            route_summary = parse_route_summary(raw_response)
+        else:
+            raw_response = fetch_routing(mode, origin_lat, origin_lng, dest_lat, dest_lng, api_key)
+            route_points = parse_routing_points(raw_response)
+            route_summary = parse_routing_summary(raw_response)
+            adjustments = {"origin": None, "destination": None}
     except KakaoRouteError as exc:
         # 카카오가 경로 자체를 못 만든 경우(출발/도착지 주변 도로 없음, 자동차 진입 불가, 결과 없음 등) —
         # 같은 좌표로 재시도해도 결과가 같으니 일시적 오류(502)와 구분해 422로 보내고, 카카오가 준
         # 사유를 그대로 실어 사용자가 어느 쪽 장소를 바꿔야 하는지 알 수 있게 한다.
-        logger.warning("kakao route error origin=%s destination=%s code=%s msg=%s", origin, destination, exc.result_code, exc.result_msg)
-        reason = f" ({exc.result_msg})" if exc.result_msg else ""
-        raise HTTPException(
-            status_code=422,
-            detail=f"선택한 위치로는 자동차 경로를 찾을 수 없어요{reason}. 다른 장소를 선택해보세요",
-        ) from exc
+        logger.warning(
+            "kakao route error mode=%s origin=%s destination=%s code=%s msg=%s",
+            mode, origin, destination, exc.result_code, exc.result_msg,
+        )
+        label = MODE_LABELS[mode]
+        if isinstance(exc, KakaoRoutingStatusError) and exc.status == "TOO_FAR_AWAY":
+            # 장소를 바꾸라는 말보다 이동수단을 바꾸라는 안내가 맞다.
+            detail = f"{label}로 가기엔 너무 먼 거리예요. 자동차로 검색해보세요"
+        else:
+            reason = f" ({exc.result_msg})" if exc.result_msg else ""
+            detail = f"선택한 위치로는 {label} 경로를 찾을 수 없어요{reason}. 다른 장소를 선택해보세요"
+        raise HTTPException(status_code=422, detail=detail) from exc
     except KakaoDirectionsError as exc:
-        logger.warning("kakao directions request failed origin=%s destination=%s: %s", origin, destination, exc)
+        logger.warning("kakao directions request failed mode=%s origin=%s destination=%s: %s", mode, origin, destination, exc)
         raise HTTPException(status_code=502, detail=f"경로를 가져오지 못했습니다: {exc}") from exc
 
     if len(route_points) < 2:
         raise HTTPException(status_code=502, detail="경로를 계산할 수 없습니다")
 
-    min_lat, max_lat, min_lng, max_lng = bounding_box_with_margin(route_points, radius_km)
+    min_lat, max_lat, min_lng, max_lng = bounding_box_with_margin(route_points, radius)
     candidates = query_candidate_restaurants(
         session, min_lat, max_lat, min_lng, max_lng, broadcast_slug=broadcast, category=category
     )
     matching_points = downsample_route_points(route_points, MAX_ROUTE_POINTS_FOR_MATCHING)
-    matches = match_restaurants_to_route(matching_points, candidates, radius_km)
+    matches = match_restaurants_to_route(matching_points, candidates, radius)
 
     restaurants = [_serialize_match(m) for m in matches]
     # Keep every collected menu for budget matching; normal cards still show only the top 3.
@@ -200,6 +221,8 @@ def get_route_restaurants(
     context_id = save_context(session, meal_candidates)
 
     return {
+        "mode": mode,
+        "radius_km": radius,
         "route": {
             "total_distance_m": route_summary["total_distance_m"],
             "total_duration_sec": route_summary["total_duration_sec"],
