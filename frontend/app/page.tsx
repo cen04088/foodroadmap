@@ -6,7 +6,7 @@ import SearchForm, { type SelectedPlace } from "../components/SearchForm";
 import FilterBar, { type Filters } from "../components/FilterBar";
 import MapFilter from "../components/MapFilter";
 import MapView from "../components/MapView";
-import RestaurantList from "../components/RestaurantList";
+import RestaurantList, { MEAL_JUMP_ATTR } from "../components/RestaurantList";
 import RestaurantDetail from "../components/RestaurantDetail";
 import RestaurantListView from "../components/RestaurantListView";
 import SavedPlacesView from "../components/SavedPlacesView";
@@ -72,6 +72,8 @@ function HomeContent() {
   const [destination, setDestination] = useState<SelectedPlace | null>(null);
   const [filters, setFilters] = useState<Filters>({ broadcast: "", category: "" });
   const [result, setResult] = useState<RouteRestaurantsResponse | null>(null);
+  // 경로 결과를 받은 시각 — "지금 출발하면" 기준으로 식사 시간대 구간을 나눈다.
+  const [departedAt, setDepartedAt] = useState<number | null>(null);
   const [mealIds, setMealIds] = useState<string[] | null>(null);
   // 검색 결과는 전체 목록부터 보여주고, 상단의 'AI 추천 보기'로 AI 플래너 화면을 연다.
   // 열려 있으면 목록 대신 플래너가 보이고, 추천이 있을 때 지도는 추천 식당만 표시한다.
@@ -140,6 +142,19 @@ function HomeContent() {
       window.removeEventListener("scroll", update);
     };
   }, []);
+
+  // 새 경로 결과가 오면 데스크톱 패널을 첫 식사 시간대 구간으로 내려 둔다. 모바일은 패널이 아니라 페이지가
+  // 스크롤되므로(컨테이너 scrollTo가 아무 일도 안 함) 지도가 밀려나지 않고, 목록 맨 위의 '바로 보기'로 맡긴다.
+  // result에만 반응한다 — AI 화면을 오가며 목록이 다시 마운트될 때마다 끌어내리지 않는다.
+  useEffect(() => {
+    const container = listScrollRef.current;
+    const target = container?.querySelector<HTMLElement>(`[${MEAL_JUMP_ATTR}]`);
+    if (!result || !container || !target) return;
+    // sticky 토글 밴드 높이만큼 준 scroll-padding을 그대로 써서 제목이 밴드 아래에 오게 한다.
+    const paddingTop = parseFloat(getComputedStyle(container).scrollPaddingTop) || 0;
+    const top = container.scrollTop + target.getBoundingClientRect().top - container.getBoundingClientRect().top - paddingTop;
+    container.scrollTo({ top, behavior: "smooth" });
+  }, [result]);
 
   function scrollListToTop() {
     const container = listScrollRef.current;
@@ -250,6 +265,7 @@ function HomeContent() {
       });
       if (seq !== searchSeqRef.current) return;
       setResult(response);
+      setDepartedAt(Date.now());
       setIsSearchCollapsed(true);
     } catch (error) {
       if (seq !== searchSeqRef.current) return;
@@ -662,6 +678,7 @@ function HomeContent() {
                   onShowDetail={handleShowDetail}
                   scrollToId={listScrollTarget}
                   aiPickIds={mealIds}
+                  departureTime={departedAt}
                 />}
               </>
             ) : (

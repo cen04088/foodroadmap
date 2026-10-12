@@ -16,6 +16,11 @@ export function formatDepartureOffset(totalSeconds: number): string {
   return `출발 후 ${formatDuration(totalSeconds)}`;
 }
 
+// 도착 예정 시각. 오전/오후 없이 24시간제로 짧게 쓴다 — 구간 제목 한 줄에 범위 두 개가 들어간다.
+export function formatClock(date: Date): string {
+  return `${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 export function formatDistance(km: number): string {
   return `${km.toFixed(1)}km`;
 }
