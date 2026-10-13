@@ -558,3 +558,115 @@ def test_run_crawl_does_not_dispose_an_injected_session_factorys_engine():
     # its underlying engine/connection was left open by run_crawl.
     with session_factory() as session:
         assert session.get(Restaurant, "place-1") is not None
+
+
+# --- One place, two matzipmap place pages (e.g. 일미장어 under 백반기행 and 백년가게) ---
+
+TWO_PROGRAMS_HTML = """
+<a class="lp-net__card" href="/broadcast/baekban">
+  <span class="lp-net__meta"><span class="lp-net__name">허영만의 백반기행</span></span>
+</a>
+<a class="lp-net__card" href="/broadcast/centennial">
+  <span class="lp-net__meta"><span class="lp-net__name">백년가게</span></span>
+</a>
+"""
+
+
+def list_page(place_id, name, phone="02-777-4380"):
+    return f"""
+<li><a class="bc-item" href="/place/{place_id}">
+  <span class="bc-item__body">
+    <span class="bc-item__name">{name}<span class="bc-item__cat">한식</span></span>
+    <span class="bc-item__addr">서울특별시 용산구 후암로57길 35-15</span>
+    <span class="bc-item__meta"><span>📞 {phone}</span></span>
+  </span>
+</a></li>
+"""
+
+
+def detail_page(name, lat, lng, youtube_id=None):
+    youtube = (f'<a class="pgal__cell" href="https://www.youtube.com/watch?v={youtube_id}"></a>'
+               if youtube_id else "")
+    return f"""
+<script type="application/ld+json">
+{{"@type": "Restaurant", "name": "{name}", "geo": {{"latitude": {lat}, "longitude": {lng}}}}}
+</script>
+{youtube}
+"""
+
+
+def fake_site(pages):
+    def fetch(url, **kwargs):
+        path = url.removeprefix(BASE_URL).split("?")[0]
+        if path in pages:
+            return pages[path]
+        raise AssertionError(f"unexpected url: {url}")
+    return fetch
+
+
+ILMI_PAGES = {
+    "/broadcasts": TWO_PROGRAMS_HTML,
+    "/broadcast/baekban": list_page("ilmi-a", "일미장어"),
+    "/broadcast/centennial": list_page("ilmi-b", "일미장어"),
+    "/place/ilmi-a": detail_page("일미장어", 37.5521681, 126.9743381),
+    "/place/ilmi-b": detail_page("일미장어", 37.5521681, 126.9743381, youtube_id="abc"),
+}
+
+
+def test_run_crawl_attaches_another_page_of_the_same_place_to_the_existing_row():
+    session_factory = make_in_memory_session_factory()
+
+    for _ in range(2):  # a rerun must not split the place back into two rows
+        with patch("app.crawler.run_crawl.fetch_url", side_effect=fake_site(ILMI_PAGES)), \
+             patch("app.crawler.run_crawl.time.sleep"):
+            run_crawl(session_factory=session_factory)
+
+        with session_factory() as session:
+            assert session.query(Restaurant).count() == 1
+            restaurant = session.get(Restaurant, "ilmi-a")
+            assert {b.name for b in restaurant.broadcasts} == {"허영만의 백반기행", "백년가게"}
+            # The second page only fills what the first one lacked.
+            assert restaurant.youtube_url == "https://www.youtube.com/watch?v=abc"
+
+
+def test_run_crawl_tags_the_row_left_by_a_merge_when_its_other_page_comes_back():
+    session_factory = make_in_memory_session_factory()
+    with session_factory() as session:
+        session.add(Restaurant(id="ilmi-b", name="일미장어", latitude=37.5521681, longitude=126.9743381,
+                               broadcasts=[Broadcast(id="centennial", name="백년가게")]))
+        session.commit()
+
+    with patch("app.crawler.run_crawl.fetch_url", side_effect=fake_site(ILMI_PAGES)), \
+         patch("app.crawler.run_crawl.time.sleep"):
+        run_crawl(session_factory=session_factory)
+
+    with session_factory() as session:
+        assert session.get(Restaurant, "ilmi-a") is None
+        restaurant = session.get(Restaurant, "ilmi-b")
+        assert {b.name for b in restaurant.broadcasts} == {"허영만의 백반기행", "백년가게"}
+
+
+def test_run_crawl_keeps_same_name_places_far_apart_as_separate_rows():
+    session_factory = make_in_memory_session_factory()
+    pages = {**ILMI_PAGES, "/place/ilmi-b": detail_page("일미장어", 37.5367409, 126.9696679)}
+
+    with patch("app.crawler.run_crawl.fetch_url", side_effect=fake_site(pages)), \
+         patch("app.crawler.run_crawl.time.sleep"):
+        run_crawl(session_factory=session_factory)
+
+    with session_factory() as session:
+        assert [b.name for b in session.get(Restaurant, "ilmi-a").broadcasts] == ["허영만의 백반기행"]
+        assert [b.name for b in session.get(Restaurant, "ilmi-b").broadcasts] == ["백년가게"]
+
+
+def test_run_crawl_matches_a_page_geocoded_a_little_off_when_the_phone_agrees():
+    session_factory = make_in_memory_session_factory()
+    # 46m apart: one page placed by its lot-number address, the other by its street address.
+    pages = {**ILMI_PAGES, "/place/ilmi-b": detail_page("일미장어", 37.5525811, 126.9743381)}
+
+    with patch("app.crawler.run_crawl.fetch_url", side_effect=fake_site(pages)),          patch("app.crawler.run_crawl.time.sleep"):
+        run_crawl(session_factory=session_factory)
+
+    with session_factory() as session:
+        assert session.query(Restaurant).count() == 1
+        assert {b.name for b in session.get(Restaurant, "ilmi-a").broadcasts} == {"허영만의 백반기행", "백년가게"}

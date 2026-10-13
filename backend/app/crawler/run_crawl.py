@@ -1,6 +1,7 @@
 import logging
 import time
 
+from app.crawler.dedup import find_same_place
 from app.crawler.fetch import fetch_url
 from app.crawler.parser import (
     parse_broadcasts_list_page,
@@ -58,17 +59,40 @@ def upsert_restaurant(session, data: dict) -> Restaurant:
     # 빈 리스트로 덮어쓰지 않는다 — 파싱이 일시적으로/마크업 변경으로 실패해 []를
     # 반환하면 이미 잘 모아둔 메뉴를 지워버릴 수 있어서, 실제로 뭔가 파싱됐을 때만 교체한다.
     if data.get("menu"):
-        restaurant.menu_items = [
-            MenuItem(
-                name=item["name"],
-                price_won=item.get("price_won"),
-                is_representative=item.get("is_representative", False),
-                position=item.get("position", 0),
-            )
-            for item in data["menu"]
-        ]
+        restaurant.menu_items = _menu_items(data["menu"])
 
     return restaurant
+
+
+def _menu_items(menu: list[dict]) -> list[MenuItem]:
+    return [
+        MenuItem(
+            name=item["name"],
+            price_won=item.get("price_won"),
+            is_representative=item.get("is_representative", False),
+            position=item.get("position", 0),
+        )
+        for item in menu
+    ]
+
+
+def upsert_crawled_restaurant(session, data: dict) -> Restaurant:
+    """처음 보는 place 페이지가 이미 있는 가게의 또 다른 페이지면 새 행을 만들지 않고 그 행을 돌려준다.
+
+    matzipmap은 같은 가게를 방송마다 다른 uuid로 올리기도 한다 (app.crawler.dedup 참고). 그 페이지의
+    데이터로 기존 행을 덮지는 않고 비어 있는 칸만 채운다 — 기존 행의 정보는 그 행 자신의 페이지가 갱신한다.
+    """
+    if session.get(Restaurant, data["external_id"]) is None and data.get("latitude") is not None:
+        existing = find_same_place(session, name=data.get("name"), latitude=data["latitude"],
+                                   longitude=data["longitude"], phone=data.get("phone"))
+        if existing is not None:
+            for field in ("category", "address", "phone", "hours", "youtube_url"):
+                if not getattr(existing, field) and data.get(field):
+                    setattr(existing, field, data[field])
+            if not existing.menu_items and data.get("menu"):
+                existing.menu_items = _menu_items(data["menu"])
+            return existing
+    return upsert_restaurant(session, data)
 
 
 def collect_program_restaurants(slug: str) -> list[dict]:
@@ -151,10 +175,13 @@ def run_crawl(session_factory=None) -> None:
                 "site structure may have changed"
             )
 
-        # external_ids whose detail page has already been fetched during this
-        # run, so a restaurant listed under multiple programs is only fetched
-        # once while still getting every program's broadcast association.
-        fetched_external_ids: set[str] = set()
+        # external_id -> the restaurant row it was stored as, for every detail
+        # page already fetched during this run, so a restaurant listed under
+        # multiple programs is only fetched once while still getting every
+        # program's broadcast association. The row id differs from the
+        # external_id when the page turned out to be another page of a place
+        # already in the DB (see upsert_crawled_restaurant).
+        resolved_ids: dict[str, str] = {}
 
         with session_factory() as session:
             for program in programs:
@@ -182,8 +209,7 @@ def run_crawl(session_factory=None) -> None:
                 for item in items:
                     external_id = item["external_id"]
 
-                    if external_id not in fetched_external_ids:
-                        fetched_external_ids.add(external_id)
+                    if external_id not in resolved_ids:
                         time.sleep(REQUEST_DELAY_SECONDS)
                         try:
                             detail_html = fetch_url(f"{BASE_URL}/place/{external_id}")
@@ -203,9 +229,9 @@ def run_crawl(session_factory=None) -> None:
                             merged["youtube_url"] = detail.get("youtube_url")
                             merged["menu"] = detail.get("menu")
 
-                        upsert_restaurant(session, merged)
+                        resolved_ids[external_id] = upsert_crawled_restaurant(session, merged).id
 
-                    restaurant = session.get(Restaurant, external_id)
+                    restaurant = session.get(Restaurant, resolved_ids[external_id])
                     broadcast = session.get(Broadcast, program["slug"])
                     if broadcast is None:
                         # Not reachable today (the broadcast is always upserted
@@ -222,8 +248,9 @@ def run_crawl(session_factory=None) -> None:
                 session.commit()
 
         logger.info(
-            "crawl complete: %d restaurants across %d programs",
-            len(fetched_external_ids),
+            "crawl complete: %d place pages (%d stored as restaurants) across %d programs",
+            len(resolved_ids),
+            len(set(resolved_ids.values())),
             len(programs),
         )
     finally:

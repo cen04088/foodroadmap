@@ -9,11 +9,11 @@ python -m app.crawler.import_channel data/channels/dudley.json [--write]
 import argparse
 import json
 import os
-import re
 from pathlib import Path
 
 from sqlalchemy import select
 
+from app.crawler.dedup import name_key
 from app.crawler.run_crawl import upsert_broadcast, upsert_restaurant
 from app.db import init_db, make_engine, make_session_factory
 from app.geo import haversine_km
@@ -22,22 +22,18 @@ from app.models import Restaurant
 SAME_PLACE_KM = 0.15
 
 
-def _name_key(name: str) -> str:
-    return re.sub(r"\s+|\(주\)|주식회사|본점$", "", name or "").casefold()
-
-
 def _restaurant_id(slug: str, source_id: str) -> str:
     return f"{slug}:{source_id}"
 
 
 def find_existing(candidates: list[Restaurant], row: dict) -> Restaurant | None:
-    key = _name_key(row["name"])
+    key = name_key(row["name"])
     best = None
     for r in candidates:
         if r.latitude is None:
             continue
         distance = haversine_km(row["latitude"], row["longitude"], r.latitude, r.longitude)
-        other = _name_key(r.name)
+        other = name_key(r.name)
         if distance <= SAME_PLACE_KM and key and other and (key in other or other in key):
             if best is None or distance < best[0]:
                 best = (distance, r)
