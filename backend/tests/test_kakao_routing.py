@@ -101,8 +101,11 @@ def test_fetch_routing_raises_directions_error_for_http_error_without_status():
     fake = Mock(ok=False, status_code=401)
     fake.json.return_value = {"errorType": "AccessDeniedError", "message": "wrong appKey"}
     with patch("app.kakao.routing.requests.get", return_value=fake):
-        with pytest.raises(KakaoDirectionsError):
+        with pytest.raises(KakaoDirectionsError) as excinfo:
             fetch_routing("walk", 37.5, 127.0, 37.6, 127.1, "key")
+    # 콘솔 설정 문제를 바로 알 수 있게 카카오가 준 사유를 오류 메시지에 남긴다.
+    assert "HTTP 401" in str(excinfo.value)
+    assert "AccessDeniedError: wrong appKey" in str(excinfo.value)
 
 
 def test_fetch_routing_raises_directions_error_on_network_failure():

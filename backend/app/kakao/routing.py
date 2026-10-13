@@ -63,7 +63,12 @@ def fetch_routing(
         raise KakaoDirectionsError(f"Kakao routing returned a non-JSON response: HTTP {response.status_code}")
     if response.ok or body.get("status") in STATUS_MESSAGES:
         return body
-    raise KakaoDirectionsError(f"Kakao routing request failed: HTTP {response.status_code}")
+    # 권한·쿼터 오류는 카카오가 사유를 실어 준다({"errorType", "message"} 또는 {"code", "msg"}).
+    # 콘솔에서 무엇을 켜야 하는지가 여기 들어 있어서 로그·응답에 남긴다.
+    reason = body.get("message") or body.get("msg") or ""
+    kind = body.get("errorType") or body.get("code") or ""
+    suffix = f" {kind}: {str(reason)[:200]}" if (kind or reason) else ""
+    raise KakaoDirectionsError(f"Kakao routing request failed: HTTP {response.status_code}{suffix}")
 
 
 def parse_routing_summary(response: dict) -> dict:
